@@ -4,29 +4,31 @@ import math
 from pythonosc import dispatcher
 from pythonosc import osc_server
 
-def print_note_handler(unused_addr, args, note):
+def printCurrentNote(unused_addr, args, note):
   """
   Prints incoming notes as they are received
   """
   print("[{0}] ~ {1}".format(args[0], note))
 
-def print_compute_handler(unused_addr, args, volume):
-  try:
-    print("[{0}] ~ {1}".format(args[0], args[1](volume)))
-  except ValueError: pass
-
 notegroup = []
 phraselist = []
-def lol(unused_addr, args, note, time):
+def updatePhraseList(unused_addr, args, note, time):
+  """
+  -Receives note and time since previous note
+  -Divides series of notes into phrases and appends phrases to list
+  -Very crude method of dividing phrases
+  """
   global notegroup
-  if time < 800:
+  global phraselist
+  if time < 800: #800 milliseconds is an arbitrary number
     notegroup.append(note)
   else:
     print(notegroup)
+    phraselist.append(notegroup)
     notegroup = []
 
 denselist = []
-def makeDensityList(unused_addr, args, density):
+def updateDensityList(unused_addr, args, density):
   """
   -Receives the note density at a regular interval of time
   -Appends the value to a global list variable
@@ -47,10 +49,9 @@ if __name__ == "__main__":
   #to the designated function
   dispatcher = dispatcher.Dispatcher()
   dispatcher.map("/debug", print)
-  dispatcher.map("/space", lol, "space")
-  dispatcher.map("/density", makeDensityList, "space")
-  dispatcher.map("/logvolume", print_compute_handler, "Log volume", math.log)
-
+  dispatcher.map("/space", updatePhraseList, "space")
+  dispatcher.map("/density", updateDensityList, "density")
+  
   #Launches the server and continues to run until manually ended
   server = osc_server.ThreadingOSCUDPServer(
       (args.ip, args.port), dispatcher)
