@@ -7,7 +7,7 @@ https://pypi.python.org/pypi/python-osc
 """
 
 import argparse
-from random import randint, shuffle
+from random import randint, shuffle, uniform
 from time import sleep
 from pythonosc import osc_message_builder
 from pythonosc import udp_client
@@ -15,44 +15,37 @@ from pythonosc import udp_client
 IP_Address = "127.0.0.1"
 OSC_Port = 5005
 
-def sendMsg(n, t, addr):
-    """
-    Sends a simple series of non-repeating notes (as midi numbers)
-    over the designated OSC port, one note per second.
-    The series is made up of four notes in a C Major chord:
-    C5 (60), E5 (64), G5 (67), C6 (72)
-    """    
-    msg = osc_message_builder.OscMessageBuilder(address = addr)
-    msg.add_arg(n)
-    msg.add_arg(t)
-    msg = msg.build()
-    client.send(msg)
-
-def sendNote(n):
+def sendNote(pitch, duration, velocity, c1, c2, c3, c4):
     """
     Sends a simple series of non-repeating notes (as midi numbers)
     over the designated OSC port
     """    
     msg = osc_message_builder.OscMessageBuilder(address = "/note")
-    msg.add_arg(n)
+    msg.add_arg(pitch)
+    msg.add_arg(duration)
+    msg.add_arg(velocity)
+    msg.add_arg(c1)
+    msg.add_arg(c2)
+    msg.add_arg(c3)
+    msg.add_arg(c4)
     msg = msg.build()
     client.send(msg)
 
 def makeTwelveToneRow():
-    """ Generates series of all 12 chromatic pitches from C5 to B5 in random order """
+    """ Generates series of all 12 chromatic notes from C5 to B5 in random order """
     row = [i for i in range(60,72)]
     shuffle(row)
-    return row
+    return [[pitch, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]
+            for pitch in row]
 
-def playPhrase(p):
-    p.reverse() #reverse it then pop
-    while(len(p) > 1):
-        nextnote = p.pop()
-        sendMsg(nextnote, 500, "/space")
-        sleep(0.5)
-    sleep(0.5) #total of 1 second; will recognize end of phrase
-    sendMsg(p.pop(), 1000, "/space")
-    
+def playPhrase(notelist):
+    copyp = notelist
+    length = len(copyp)
+    count = 0
+    for note, duration, velocity, c1, c2, c3, c4 in copyp:
+        sendNote(note, duration, velocity, c1, c2, c3, c4)
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", default=IP_Address,
@@ -62,17 +55,30 @@ if __name__ == "__main__":
     args = parser.parse_args()     
     client = udp_client.UDPClient(args.ip, args.port)
 
-    #Outlines a C Major chord starting on C5
-    notes1 = [60, 64, 67, 72]
-    #Lowers the two Cs to Bs, making an E Major chord in second inversion 
-    notes2 = [59, 64, 67, 71]
+    #cmaj outlines a C Major chord starting on C5.
+    #emin lowers the two Cs to Bs, making an E Minor chord in second inversion.
+    #Duration and velocity are fixed for all notes. MFCC is randomized.
+    cmaj = [[60, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
+            [64, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
+            [67, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
+            [72, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]]
+    emin = [[59, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
+            [64, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
+            [67, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
+            [72, 100, 50,
+             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]]
     
     while(True):
-        playPhrase(notes1)
-        notes1 = [60, 64, 67, 72] #because pop emptied it...
-        sleep(3)
-        playPhrase(notes2)
-        notes2 = [59, 64, 67, 71]
-        sleep(3)
+        playPhrase(cmaj)
+        sleep(1)
+        playPhrase(emin)
+        sleep(1)
         playPhrase(makeTwelveToneRow())
         sleep(3)
