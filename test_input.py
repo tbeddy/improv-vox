@@ -35,9 +35,7 @@ def makeTwelveToneRow():
     """ Generates series of all 12 chromatic notes from C5 to B5 in random order """
     row = [i for i in range(60,72)]
     shuffle(row)
-    return [[pitch, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]
-            for pitch in row]
+    return [makeRandomParameters(pitch) for pitch in row]
 
 def playPhrase(notelist):
     copyp = notelist
@@ -45,6 +43,12 @@ def playPhrase(notelist):
     count = 0
     for note, duration, velocity, c1, c2, c3, c4 in copyp:
         sendNote(note, duration, velocity, c1, c2, c3, c4)
+
+def makeRandomParameters(pitch):
+    """
+    -Returns an array with the designated pitch and other parameters randomized 
+    """
+    return [pitch, randint(100, 200), randint(40, 60), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -58,22 +62,8 @@ if __name__ == "__main__":
     #cmaj outlines a C Major chord starting on C5.
     #emin lowers the two Cs to Bs, making an E Minor chord in second inversion.
     #Duration and velocity are fixed for all notes. MFCC is randomized.
-    cmaj = [[60, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
-            [64, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
-            [67, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
-            [72, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]]
-    emin = [[59, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
-            [64, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
-            [67, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)],
-            [72, 100, 50,
-             uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]]
+    cmaj = [makeRandomParameters(60), makeRandomParameters(64), makeRandomParameters(67), makeRandomParameters(72)]
+    emin = [makeRandomParameters(59), makeRandomParameters(64), makeRandomParameters(67), makeRandomParameters(71)]
     
     while(True):
         playPhrase(cmaj)
