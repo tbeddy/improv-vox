@@ -15,6 +15,10 @@ Included in this repo are a test script, an image of my current Max/MSP set-up, 
 
 Both are available via pip.
 
+## Running
+
+To use the system, run the file improv_agent.py in a Terminal session and open the files voice_input.maxpat and synth_output.maxpat in Max/MSP. Click the ezadc~ button (at the top of the voice_input file) to begin.
+
 ## Contributing
 
 Because this project is a part of my undergraduate thesis work, I can't ethically accept any contributions. However, once my work for it is done academically, I would be more than happy to accept look over any pull requests for features or bugs and discuss how the project can develop. The writing accompanying the project largely resolves around the personal process of developing the software, but I'd love to see how the process develops once more minds enter the fray. If you enjoy the idea of computational creativity and improvised music, send me a message and I'd love to talk!
