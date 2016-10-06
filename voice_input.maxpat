@@ -38,6 +38,17 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-1",
+					"maxclass" : "ezdac~",
+					"numinlets" : 2,
+					"numoutlets" : 0,
+					"patching_rect" : [ 729.0, 99.166672, 45.0, 45.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-30",
 					"maxclass" : "number",
 					"numinlets" : 1,
@@ -713,7 +724,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 611.666626, 590.666748, 31.0, 22.0 ],
+					"patching_rect" : [ 611.666626, 590.666748, 29.5, 22.0 ],
 					"presentation" : 1,
 					"presentation_rect" : [ 591.999939, 257.333374, 31.0, 22.0 ],
 					"style" : "",

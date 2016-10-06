@@ -1,6 +1,7 @@
 """
 This is a class for musical notes.
 """
+from music21 import *
 
 class MyNote:
 
@@ -9,3 +10,7 @@ class MyNote:
         self.duration = d
         self.velocity = v
         self.mfcc = [c1, c2, c3, c4]
+
+        n = note.Note()
+        n.frequency = p
+        self.m21 = n

@@ -24,6 +24,7 @@ MIT License (c) Tim Bedford
 
 import argparse
 import math
+from collections import Counter
 from copy import deepcopy
 from random import randint
 from music21 import *
@@ -44,13 +45,13 @@ client = udp_client.UDPClient(output_args.ip, output_args.port)
 
 #All notes played by the program and phrases derived from these notes
 comp_all_notes = []
-comp_phrases = []
+comp_motifs = []
 
 #All notes played by the human and phrases derived from these notes
 human_all_notes = []
-human_phrases = []
+human_motifs = []
 
-def storeNewNote(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4):
+def store_new_note(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4):
     """
     -Stores incoming notes in as they are received
     -Receives notes as series of seven parameters:
@@ -62,28 +63,58 @@ def storeNewNote(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4):
     global human_all_notes
     new_note = MyNote(pitch, duration, velocity, c1, c2, c3, c4)
     human_all_notes.append(new_note)
-    sendNote(new_note) #try sending a note; should not be in final function
-    
-def keyOfPhrase(p):
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Analysis~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#These functions are for analyzing notes or phrases.
+        
+def key_of_phrase(p):
     """ Determines key of phrase """
     key = p.analyze('key')
     return [key.tonic.name, key.mode]
               
-def phraseToStream(nums):
+def phrase_to_stream(nums):
     stream1 = stream.Stream()
     for i in nums:
         stream1.append(note.Note(midiNumToNote(i)))
     return stream1
 
-def midiNumToNote(i):
+def midi_num_to_note(i):
     x = pitch.Pitch()
     x.midi = i
     return x.nameWithOctave
 
-def pitchRange(p):
+def pitch_range(p):
     """ Finds range between highest and lowest pitch in phrase """
     fe = features.jSymbolic.RangeFeature(p)
     return fe.extract().vector[0]
+
+def motif_detection(notelist, parameter):
+    """
+    -Looks for patterns in a list of notes
+    -Patterns are intended to be recognizable musical motifs 
+    """
+
+    if parameter == "duration":
+        note_parameter_list = [n.duration for n in notelist]
+    elif parameter == "pitch":
+        note_parameter_list = [n.pitch for n in notelist]
+    subnotelist_coll = []
+    
+    for i in range(len(note_parameter_list)//2, 1, -1): #each possible sublist length
+        subnotelist_coll.append([str(x[j:j+i]) for j in range(0, len(note_parameter_list)-(i-1))])
+
+    #make a Counter object for each list of possible motifs
+    cnt = [Counter(minilist) for minilist in subnotelist_coll]
+
+    #grab the most common from each Counter
+    most_common_motifs = [Counter(c).most_common(1) for c in cnt]
+
+    #remove any motifs that are only found once
+    most_common_motifs = [motif for motif in most_common_motifs if (motif[1] > 1)]
+    
+    #return the longest motif, if the list isn't empty
+    if most_common_motifs:
+        return most_common_motifs[0]
 
 #~~~~~~~~~~~~~~~~~~~~~~~~Generative Functions~~~~~~~~~~~~~~~~~~~~~~
 #These functions are for the purpose of generating new material.
@@ -186,7 +217,7 @@ def add_flourish(phrase):
 
 #~~~~~~~~~~~~~~~~~~~~~OSC Sending~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def sendNote(this_note):
+def send_note(this_note):
     """
     -Sends each of the parameters of a note as an OSC message
     """
