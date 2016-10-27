@@ -43,6 +43,7 @@ def playPhrase(notelist):
     count = 0
     for note, duration, velocity, c1, c2, c3, c4 in copyp:
         sendNote(note, duration, velocity, c1, c2, c3, c4)
+        sleep(duration/1000.0)
 
 def makeRandomParameters(pitch):
     """
@@ -61,14 +62,10 @@ if __name__ == "__main__":
 
     #cmaj outlines a C Major chord starting on C5.
     #emin lowers the two Cs to Bs, making an E Minor chord in second inversion.
-    #Duration and velocity are fixed for all notes. MFCC is randomized.
     cmaj = [makeRandomParameters(60), makeRandomParameters(64), makeRandomParameters(67), makeRandomParameters(72)]
     emin = [makeRandomParameters(59), makeRandomParameters(64), makeRandomParameters(67), makeRandomParameters(71)]
     
     while(True):
         playPhrase(cmaj)
-        sleep(1)
         playPhrase(emin)
-        sleep(1)
-        playPhrase(makeTwelveToneRow())
-        sleep(3)
+        #playPhrase(makeTwelveToneRow())        
