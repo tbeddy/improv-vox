@@ -12,5 +12,12 @@ class MyNote:
         self.mfcc = [c1, c2, c3, c4]
 
         n = note.Note()
-        n.frequency = p
+        #use n.frequency in future version that uses frequency as input instead of midi
+        n.pitch.midi = p
         self.m21 = n
+
+    def __repr__(self):
+        """
+        -Returns just the pitch and duration for now
+        """
+        return "{},{}".format(self.pitch, self.duration)
