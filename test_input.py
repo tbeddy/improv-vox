@@ -45,11 +45,11 @@ def playPhrase(notelist):
         sendNote(note, duration, velocity, c1, c2, c3, c4)
         sleep(duration/1000.0)
 
-def makeRandomParameters(pitch):
+def makeRandomParameters(pitch, duration):
     """
-    -Returns an array with the designated pitch and other parameters randomized 
+    -Returns an array with the designated pitch and duration and other parameters randomized 
     """
-    return [pitch, randint(100, 200), randint(40, 60), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]
+    return [pitch, duration, randint(40, 60), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -62,8 +62,14 @@ if __name__ == "__main__":
 
     #cmaj outlines a C Major chord starting on C5.
     #emin lowers the two Cs to Bs, making an E Minor chord in second inversion.
-    cmaj = [makeRandomParameters(60), makeRandomParameters(64), makeRandomParameters(67), makeRandomParameters(72)]
-    emin = [makeRandomParameters(59), makeRandomParameters(64), makeRandomParameters(67), makeRandomParameters(71)]
+    cmaj = [makeRandomParameters(60, 1000),
+            makeRandomParameters(64, 1500),
+            makeRandomParameters(67, 500),
+            makeRandomParameters(72, 1000)]
+    emin = [makeRandomParameters(59, 1500),
+            makeRandomParameters(64, 500),
+            makeRandomParameters(67, 1000),
+            makeRandomParameters(71, 1500)]
     
     while(True):
         playPhrase(cmaj)
