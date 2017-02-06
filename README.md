@@ -2,11 +2,16 @@
 
 This is a project for real-time musical improvisation. It is built around the three part "PfQ" model proposed by Blackwell et al[1]:
 
-* P - Receives audio input and outputs symbolic notation (pitch, duration, timbre). I have implemented this in Max/MSP.
-* f - Receives the symbolic notation from P and outputs symbolic notation in the same format. This is the core of this project and written in Python 3.
-* Q - Receives the symbolic notation from f and outputs synthesized sound.
+* P - Receives audio input and outputs symbolic notation (pitch, duration, timbre). Iimplemented in Max/MSP.
+* f - Receives the symbolic notation from P and outputs symbolic notation in the same format. This is the core of this project. Written in Python 3.
+* Q - Receives the symbolic notation from f and outputs synthesized sound. Written in Csound.
 
-Included in this repo are a test script, an image of my current Max/MSP set-up, and the f file.
+Included in this repo:
+* a P file
+* a f file
+* a Q file
+* a test script (to mimic P)
+* a Python class file for P
 
 ## Required libraries
 
