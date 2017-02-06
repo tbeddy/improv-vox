@@ -19,7 +19,7 @@ nchnls = 2
 0dbfs = 1
 
 alwayson "Vox"       ; Vox instrument only ends when score ends/program stops running
-giOSC OSCinit 6007
+giOSC OSCinit 6006
 giSine    ftgen 1, 0, 16384, 10, 1
 giSigmoid ftgen 2, 0, 1024,  19, 0.5, 0.5, 270, 0.5
 
@@ -35,12 +35,13 @@ instr Vox
 	iolaps = 100
 	itotdur = 3600
 	
-	;kamp init 1
 	kfund init 300
+	kmidipitch init 0
 	knotedur init 3600
 	
 	;Listen for OSC messages
-	ktrig OSClisten giOSC, "/note", "ff", kfund, knotedur
+	ktrig OSClisten giOSC, "/note", "ff", kmidipitch, knotedur
+	kfund = cpsmidinn(kmidipitch)
 	
 	; First formant.
 	k1amp = ampdb(0)
@@ -78,7 +79,7 @@ instr Vox
 	a5 fof k5amp, kfund, k5form, koct, k5band, kris, kdur, kdec, iolaps, giSine, giSigmoid, itotdur
 	
 	; Combine all of the formants together
-	asig sum (a1+a2+a3+a4+a5) ;* 13000
+	asig sum (a1+a2+a3+a4+a5)
 	outs asig, asig
 endin
 
