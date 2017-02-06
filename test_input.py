@@ -47,9 +47,15 @@ def playPhrase(notelist):
 
 def makeRandomParameters(pitch, duration):
     """
-    -Returns an array with the designated pitch and duration and other parameters randomized 
+    -Returns an array with the designated pitch and duration 
+    -Velocity is hardcoded
+    -Other parameters are randomized 
     """
-    return [pitch, duration, randint(40, 60), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0), uniform(0.1,1.0)]
+    return [pitch, duration, 60,
+            uniform(0.1,1.0),
+            uniform(0.1,1.0),
+            uniform(0.1,1.0),
+            uniform(0.1,1.0)]
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -70,7 +76,8 @@ if __name__ == "__main__":
             makeRandomParameters(64, 500),
             makeRandomParameters(67, 1000),
             makeRandomParameters(71, 1500)]
-    
+
+    print("Working...")
     while(True):
         playPhrase(cmaj)
         playPhrase(emin)
