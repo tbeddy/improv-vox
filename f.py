@@ -28,7 +28,7 @@ from queue import Queue
 from time import time
 from collections import Counter
 from copy import deepcopy
-from random import random, randint, choice, expovariate
+from random import random, randint, randrange, choice, expovariate
 from music21 import *
 from pythonosc import dispatcher, osc_server, osc_message_builder, udp_client
 from note_class import MyNote
@@ -203,7 +203,7 @@ def generate_motif():
     phrase_length = randint(2, 8) #random length for phrase
     for i in range(phrase_length): #generate several notes and append each to the stream
         current_note = MyNote(randint(45, 70), #baritone-ish voice range in MIDI values
-                              randint(100, 2500),
+                              randrange(500, 2501, 500),
                               randint(60, 90),
                               random(), random(), random(), random())
         new_motif.append(current_note)
@@ -291,15 +291,17 @@ def add_flourish(motif):
     possible_pitches = this_scale.getPitches(str(lowest_note.pitch), str(highest_note.pitch))
     new_pitch = choice(possible_pitches)
 
-    insert_point = randint(1, len(motif))           #pick a random point in the motif to insert the new note
+    insert_point = randint(1, len(motif)-1)         #pick a random point in the motif to insert the new note
     previous_note = motif[insert_point-1]
     following_note = motif[insert_point]
     
-    new_duration = randint(100, (previous_note.duration/2))  #make random duration for new note
-    motif[insert_point-1].duration -= new_duration  #shorten duration of preceding note
+    new_duration = randint(100, int(previous_note.duration/2))    #make random duration for new note
+    motif[insert_point-1].duration -= new_duration                #shorten duration of preceding note
 
     #new note's velocity is between the velocities of the notes that surround it
-    new_velocity = randint(previous_note.velocity, following_note.velocity)
+    lower_vel = min(previous_note.velocity, following_note.velocity)
+    upper_vel = max(previous_note.velocity, following_note.velocity)
+    new_velocity = randint(lower_vel, upper_vel)
     
     #create new mfcc list by randomly taking coefficients from surrounding notes
     new_mfcc = []
