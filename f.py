@@ -47,6 +47,22 @@ motdet_count = 0               #Moves up every time note is stored, reset once m
 last_time = time()*1000.0      #The last time the time was checked
 next_duration = 1000           #If this duration is passed, then next note will be sent to output
 
+stdscr = curses.initscr()      #Initialize curses
+curses.noecho()
+curses.cbreak()
+term_height = curses.LINES     #Terminal height
+term_width = curses.COLS       #Terminal width
+input_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, 0)
+motif_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, term_width//4)
+filler_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, term_width//2)
+output_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, (term_width * 3)//4)
+info_win = stdscr.subwin(term_height//8, term_width, (term_height * 7)//8, 0)
+input_win.border()
+motif_win.border()
+filler_win.border()
+output_win.border()
+info_win.border()
+
 
 #This section is to establish the "client" (the part of the program sending
 #OSC data). It will be reorganized soon, since all of these variables
@@ -217,17 +233,17 @@ def permutate_motif(motif):
     """
     func_num = randint(1, 4) #don't make the tuning functions available yet
     if (func_num == 1):
-        print("RETROGRADE")
+        #print("RETROGRADE")
         return retrograde(motif)
     elif (func_num == 2):
-        print("TRANSPOSE")
+        #print("TRANSPOSE")
         return transpose(motif, randint(-3, 3)) #random interval
     elif (func_num == 3):
-        print("STRETCH/SHRINK")
+        #print("STRETCH/SHRINK")
         possible_degrees = [0.25, 0.5, 1.5, 2.0] #degrees of stretching/shrinking allowed
         return stretch(motif, choice(possible_degrees))
     elif (func_num == 4):
-        print("FLOURISH")
+        #print("FLOURISH")
         return add_flourish(motif)
     elif (func_num == 5):
         return invert(motif)
@@ -380,6 +396,12 @@ def osc_motif_detection(unused_addr, args):
     #parameter = choice(["pitch", "duration"]) #randomly choose to look for melodic or rhythmic motifs
     parameter = "pitch"
     motif_detection(notelist, parameter)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~Curses~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#These functions are for managing the pseudo-GUI
+
+
 
 
 #~~~~~~~~~~~~~~~~~~~~~Initialize~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
