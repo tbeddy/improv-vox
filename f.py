@@ -47,21 +47,31 @@ motdet_count = 0               #Moves up every time note is stored, reset once m
 last_time = time()*1000.0      #The last time the time was checked
 next_duration = 1000           #If this duration is passed, then next note will be sent to output
 
+
 stdscr = curses.initscr()      #Initialize curses
 curses.noecho()
 curses.cbreak()
 term_height = curses.LINES     #Terminal height
 term_width = curses.COLS       #Terminal width
-input_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, 0)
-motif_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, term_width//4)
-filler_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, term_width//2)
-output_win = stdscr.subwin((term_height * 7)//8, term_width//4, 0, (term_width * 3)//4)
-info_win = stdscr.subwin(term_height//8, term_width, (term_height * 7)//8, 0)
-input_win.border()
+
+input_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, 0)
+motif_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, term_width//4)
+filler_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, term_width//2)
+output_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, (term_width*3)//4)
+info_win = stdscr.subwin(term_height//8, term_width, (term_height*7)//8, 0)
+
+input_win.border()             #Add a border to each window
 motif_win.border()
 filler_win.border()
 output_win.border()
 info_win.border()
+
+input_win.addstr("Input")
+motif_win.addstr("Motifs")
+filler_win.addstr("Filler")
+output_win.addstr("Output")
+
+stdscr.refresh()               #Make all the changes to curses visible
 
 
 #This section is to establish the "client" (the part of the program sending
@@ -95,7 +105,7 @@ def store_new_note(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4)
     """
     global human_all_notes
     new_note = MyNote(pitch, duration, velocity, c1, c2, c3, c4)
-    print("INPUT NOTE: {}".format(new_note))
+    #print("INPUT NOTE: {}".format(new_note))
     human_all_notes.append(new_note)
 
 def queue_next_motif(unused_addr, args):
@@ -110,7 +120,7 @@ def queue_next_motif(unused_addr, args):
         selected_motif = motif_pool_pitches[motif_index]
         for current_note in selected_motif:
             note_queue.put(current_note)
-        print("QUEUED")
+        #print("QUEUED")
 
 def retrieve_next_note(unused_addr, args):
     """
@@ -120,7 +130,7 @@ def retrieve_next_note(unused_addr, args):
     current_time = time()*1000.0 #check the current time, multiply by 1000.0 to get milliseconds
     if (next_duration <= (current_time - last_time)):
         current_note = note_queue.get()
-        print("OUTPUT NOTE: {}".format(current_note))
+        #print("OUTPUT NOTE: {}".format(current_note))
         send_note(current_note)
         next_duration = note_queue.queue[0].duration #store next note's duration without popping note
         last_time = current_time
@@ -176,10 +186,10 @@ def motif_detection(notelist, parameter):
             for p in most_common_motifs[0]:
                 best_motif.append(MyNote(p, 500, 60, 0.0, 0.0, 0.0, 0.0))
             motif_pool_pitches.append(best_motif)
-        print("DETECTED: {}".format(most_common_motifs[0]))
-    print("MOTIFS:")
-    for m in motif_pool_pitches:
-        print(m)
+        #print("DETECTED: {}".format(most_common_motifs[0]))
+    #print("MOTIFS:")
+    #for m in motif_pool_pitches:
+        #print(m)
     
 def quantize_duration(dur):
     """
@@ -225,13 +235,13 @@ def generate_motif():
                               random(), random(), random(), random())
         new_motif.append(current_note)
     motif_pool_pitches.append(new_motif)
-    print("GENERATED MOTIF: {}".format(new_motif))
+    #print("GENERATED MOTIF: {}".format(new_motif))
 
 def permutate_motif(motif):
     """
     -Randomly apply one of the permutation functions to the motif
     """
-    func_num = randint(1, 4) #don't make the tuning functions available yet
+    func_num = randint(1, 3) #don't make the tuning functions available yet
     if (func_num == 1):
         #print("RETROGRADE")
         return retrograde(motif)
@@ -427,5 +437,5 @@ if __name__ == "__main__":
     #Launches the server and continues to run until manually ended
     server = osc_server.ThreadingOSCUDPServer(
         (input_args.ip, input_args.port), dispatcher)
-    print("Serving on {}".format(server.server_address))
+    #print("Serving on {}".format(server.server_address))
     server.serve_forever()
