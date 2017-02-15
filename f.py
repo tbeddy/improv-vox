@@ -24,6 +24,7 @@ MIT License (c) Tim Bedford
 
 import argparse
 import math
+import curses
 from queue import Queue
 from time import time
 from collections import Counter
