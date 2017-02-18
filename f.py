@@ -396,11 +396,8 @@ if __name__ == "__main__":
     dispatcher.map("/retrievenextnote", retrieve_next_note, "note")
     dispatcher.map("/permutatemotif", osc_permutate_motif, "note")
 
-    """
     for i in range(randint(1,3)): #generate a few motifs to start out
         generate_motif()
-    """
-    generate_motif()
         
     #Launches the server and continues to run until manually ended
     server = osc_server.ThreadingOSCUDPServer(
