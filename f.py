@@ -318,14 +318,6 @@ def add_flourish(motif):
                         new_mfcc[3])
     motif.insert(insert_point, new_mynote)          #insert the new note into the motif
     return motif
-    
-def invert(phrase):
-    """
-    -Starts on intial note
-    -Next note is inversion of interval
-    -Ex: C4 to E4 (4 semitones) becomes C4 to G#3 (-4 semitones)
-    -Only alters frequency/pitch parameter (and not for first note)
-    """
 
 def make_phrase_outoftune(motif, note_num):
     """
