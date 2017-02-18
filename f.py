@@ -27,7 +27,7 @@ import math
 from queue import Queue
 from time import time
 from collections import Counter
-from copy import deepcopy
+from copy import deepcopy, copy
 from random import random, randint, randrange, choice, expovariate
 from music21 import *
 from pythonosc import dispatcher, osc_server, osc_message_builder, udp_client
@@ -77,7 +77,10 @@ def store_new_note(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4)
        -four coefficients derived from the mel-frequency cepstrum of the signal
     """
     global human_all_notes
-    new_note = MyNote(pitch, duration, velocity, c1, c2, c3, c4)
+    new_note = MyNote(pitch,
+                      quantize_duration(duration), #quantize duration before being stored
+                      velocity,
+                      c1, c2, c3, c4)
     print("INPUT NOTE: {}".format(new_note))
     human_all_notes.append(new_note)
 
@@ -93,7 +96,7 @@ def queue_next_motif(unused_addr, args):
         selected_motif = motif_pool_pitches[motif_index]
         for current_note in selected_motif:
             note_queue.put(current_note)
-        print("QUEUED")
+        #print("QUEUED")
 
 def retrieve_next_note(unused_addr, args):
     """
@@ -103,7 +106,7 @@ def retrieve_next_note(unused_addr, args):
     current_time = time()*1000.0 #check the current time, multiply by 1000.0 to get milliseconds
     if (next_duration <= (current_time - last_time)):
         current_note = note_queue.get()
-        print("OUTPUT NOTE: {}".format(current_note))
+        #print("OUTPUT NOTE: {}".format(current_note))
         send_note(current_note)
         next_duration = note_queue.queue[0].duration #store next note's duration without popping note
         last_time = current_time
@@ -139,7 +142,6 @@ def motif_detection(notelist, parameter):
         note_parameter_list = [quantize_duration(n.duration) for n in notelist]
     elif (parameter == "pitch"):
         note_parameter_list = [n.pitch for n in notelist]
-    #print("note_parameter_list: {}".format(note_parameter_list))
     subnotelist_coll = [] #store every note sequence at least two notes long here
     for i in range(len(note_parameter_list)//2, 1, -1): #each possible sublist length
         subnotelist = []
@@ -160,9 +162,6 @@ def motif_detection(notelist, parameter):
                 best_motif.append(MyNote(p, 500, 60, 0.0, 0.0, 0.0, 0.0))
             motif_pool_pitches.append(best_motif)
         print("DETECTED: {}".format(most_common_motifs[0]))
-    print("MOTIFS:")
-    for m in motif_pool_pitches:
-        print(m)
     
 def quantize_duration(dur):
     """
@@ -172,8 +171,8 @@ def quantize_duration(dur):
     """
     if (dur <= 500):
         return 500
-    elif (dur >= 3000):
-        return 3000
+    elif (dur >= 2000):
+        return 2000
     else:
         return int(round(dur / 500.0) * 500.0)
 
@@ -200,10 +199,10 @@ def generate_motif():
     """
     global motif_pool_pitches, motif_pool_durations
     new_motif = []
-    phrase_length = randint(2, 8) #random length for phrase
+    phrase_length = randint(2, 5) #random length for phrase
     for i in range(phrase_length): #generate several notes and append each to the stream
         current_note = MyNote(randint(45, 70), #baritone-ish voice range in MIDI values
-                              randrange(500, 2501, 500),
+                              randrange(500, 1501, 500), #duration already quantized
                               randint(60, 90),
                               random(), random(), random(), random())
         new_motif.append(current_note)
@@ -214,19 +213,19 @@ def permutate_motif(motif):
     """
     -Randomly apply one of the permutation functions to the motif
     """
-    func_num = randint(1, 4) #don't make the tuning functions available yet
+    func_num = randint(1, 3) #don't make the tuning functions available yet
     if (func_num == 1):
-        print("RETROGRADE")
+        #print("RETROGRADE")
         return retrograde(motif)
     elif (func_num == 2):
-        print("TRANSPOSE")
+        #print("TRANSPOSE")
         return transpose(motif, randint(-3, 3)) #random interval
     elif (func_num == 3):
-        print("STRETCH/SHRINK")
+        #print("STRETCH/SHRINK")
         possible_degrees = [0.25, 0.5, 1.5, 2.0] #degrees of stretching/shrinking allowed
         return stretch(motif, choice(possible_degrees))
     elif (func_num == 4):
-        print("FLOURISH")
+        #print("FLOURISH")
         return add_flourish(motif)
     elif (func_num == 5):
         return invert(motif)
@@ -251,10 +250,11 @@ def transpose(motif, interval):
     -Only alters frequency/pitch parameter
     -Interval must be an integer
     """
-    for current_note in motif:
+    new_motif = deepcopy(motif)     #make new motif from deepcopy of original motif
+    for current_note in new_motif:
         current_note.pitch += interval
-    return motif
-    
+    return new_motif
+  
 def stretch(motif, degree):
     """
     -Stretches (or shrinks) phrase duration
@@ -262,20 +262,21 @@ def stretch(motif, degree):
     -Use float between 0.0 and 1.0 to shrink
     -Only alters duration parameter
     """
-    if (any(n.duration > 1000 for n in motif)) and (degree >= 1.0):    #don't stretch motifs with very long notes
+    if (any(n.duration > 2000 for n in motif)) and (degree >= 1.0):    #don't stretch motifs with very long notes
         degree = choice([0.25, 0.5])
     elif (any(n.duration < 500 for n in motif)) and (degree <= 1.0):   #don't shrink motifs with very short notes
-        degree = choice([1.5, 2.0])
-    for current_note in motif:
+        #degree = choice([1.5, 2.0])
+        degree = 2.0
+    new_motif = deepcopy(motif)     #make new motif from deepcopy of original motif
+    for current_note in new_motif:
         current_note.duration = int(current_note.duration * degree)
-    return motif
+    return new_motif
 
 def add_flourish(motif):
     """
     -Adds one note to a phrase in the same key
     """
-    #extract pitch info from motif into music21 stream
-    motif_stream = stream.Stream()
+    motif_stream = stream.Stream()                  #extract pitch info from motif into music21 stream
     for n in motif:
         current_note = note.Note()                  #create new note
         current_note.pitch.midi = n.pitch           #set note's pitch
@@ -295,7 +296,7 @@ def add_flourish(motif):
     previous_note = motif[insert_point-1]
     following_note = motif[insert_point]
     
-    new_duration = randint(100, int(previous_note.duration/2))    #make random duration for new note
+    new_duration = randrange(250, int(previous_note.duration/2), 250)    #make random duration for new note
     motif[insert_point-1].duration -= new_duration                #shorten duration of preceding note
 
     #new note's velocity is between the velocities of the notes that surround it
@@ -367,10 +368,15 @@ def osc_generate_motif(unused_addr, args):
 
 def osc_permutate_motif(unused_addr, args):
     global motif_pool_pitches
+
+    print("MOTIFS:")
+    for m in motif_pool_pitches:
+        print(m)
+    
     old_motif = choice(motif_pool_pitches)
     new_motif = permutate_motif(old_motif)        #generate a new motif by permutating one of the saved motifs
     while (new_motif in motif_pool_pitches):      #if the new motif has already been generated, generate a new motif
-        new_motif = permutate_motif(old_motif)
+        new_motif = permutate_motif(choice(motif_pool_pitches))
     motif_pool_pitches.append(new_motif)
 
 def osc_motif_detection(unused_addr, args):
@@ -398,8 +404,11 @@ if __name__ == "__main__":
     dispatcher.map("/retrievenextnote", retrieve_next_note, "note")
     dispatcher.map("/permutatemotif", osc_permutate_motif, "note")
 
+    """
     for i in range(randint(1,3)): #generate a few motifs to start out
         generate_motif()
+    """
+    generate_motif()
         
     #Launches the server and continues to run until manually ended
     server = osc_server.ThreadingOSCUDPServer(
