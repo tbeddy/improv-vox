@@ -45,6 +45,8 @@ motdet_pace = 5                #Number of notes passed until motif_detection is 
 motdet_count = 0               #Moves up every time note is stored, reset once motif_detection_pace is reached
 last_time = time()*1000.0      #The last time the time was checked
 next_duration = 1000           #If this duration is passed, then next note will be sent to output
+lowest_pitch = 45              #Lowest pitch the system is allowed to make
+highest_pitch = 70             #Highest pitch the system is allowed to make
 
 
 #This section is to establish the "client" (the part of the program sending
@@ -201,7 +203,7 @@ def generate_motif():
     new_motif = []
     phrase_length = randint(2, 5) #random length for phrase
     for i in range(phrase_length): #generate several notes and append each to the stream
-        current_note = MyNote(randint(45, 70), #baritone-ish voice range in MIDI values
+        current_note = MyNote(randint(lowest_pitch, highest_pitch), #baritone-ish voice range in MIDI values
                               randrange(500, 1501, 500), #duration already quantized
                               randint(60, 90),
                               random(), random(), random(), random())
@@ -214,6 +216,7 @@ def permutate_motif(motif):
     -Randomly apply one of the permutation functions to the motif
     """
     func_num = randint(1, 3) #don't make the tuning functions available yet
+    #func_num = 4
     if (func_num == 1):
         #print("RETROGRADE")
         return retrograde(motif)
@@ -225,10 +228,11 @@ def permutate_motif(motif):
         possible_degrees = [0.25, 0.5, 1.5, 2.0] #degrees of stretching/shrinking allowed
         return stretch(motif, choice(possible_degrees))
     elif (func_num == 4):
+        #print("PITCH TRANSFORM")
+        return transform_pitch(motif)
+    elif (func_num == 5):
         #print("FLOURISH")
         return add_flourish(motif)
-    elif (func_num == 5):
-        return invert(motif)
     elif (func_num == 6):
         return make_phrase_outoftune(motif)
     elif (func_num == 7):
@@ -270,6 +274,19 @@ def stretch(motif, degree):
     new_motif = deepcopy(motif)     #make new motif from deepcopy of original motif
     for current_note in new_motif:
         current_note.duration = int(current_note.duration * degree)
+    return new_motif
+
+def transform_pitch(motif):
+    """
+    -randomly transform one pitch
+    """
+    new_motif = deepcopy(motif)
+    transform_point = randint(0, len(new_motif)-1)                       #pick a random point in the motif to transform
+    old_pitch = new_motif[transform_point].pitch
+    possible_pitches = [i for i in range(lowest_pitch, old_pitch)] + \   #pitches available (that aren't the old pitch)
+                       [i for i in range(old_pitch+1, highest_pitch)]
+    new_pitch = choice(possible_pitches)
+    new_motif[transform_point].pitch = new_pitch
     return new_motif
 
 def add_flourish(motif):
@@ -317,7 +334,7 @@ def add_flourish(motif):
                         new_mfcc[2],
                         new_mfcc[3])
     motif.insert(insert_point, new_mynote)          #insert the new note into the motif
-    return motif
+    return deepcopy(motif)
 
 def make_phrase_outoftune(motif, note_num):
     """
@@ -367,6 +384,9 @@ def osc_permutate_motif(unused_addr, args):
     
     old_motif = choice(motif_pool_pitches)
     new_motif = permutate_motif(old_motif)        #generate a new motif by permutating one of the saved motifs
+
+    #print("SAME???? {}".format(old_motif == new_motif))
+    
     while (new_motif in motif_pool_pitches):      #if the new motif has already been generated, generate a new motif
         new_motif = permutate_motif(choice(motif_pool_pitches))
     motif_pool_pitches.append(new_motif)
