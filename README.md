@@ -23,11 +23,13 @@ Both are available via pip.
 ## Usage
 
 To use the system:
+
 1.  Run the file P.maxpat in Max.
 2.  Run the file Q.csd in Csound
 3.  Run the file f.py in your terminal.
 
 ## TODO
+
 * Make OSC usage in f more consistent
 * Finish implementing curses
 * Make the docs/comments more consistent and pretty
