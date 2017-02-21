@@ -20,9 +20,23 @@ Included in this repo:
 
 Both are available via pip.
 
-## Running
+## Usage
 
-To use the system, run the file improv_agent.py in a Terminal session and open the files voice_input.maxpat and synth_output.maxpat in Max/MSP. Click the ezadc~ button (at the top of the voice_input file) to begin.
+To use the system:
+1. Run the file P.maxpat in Max.
+2. Run the file Q.csd in Csound
+3. Run the file f.py in your terminal.
+
+## TODO
+* Make OSC usage in f more consistent
+* Finish implementing curses
+* Make the docs/comments more consistent and pretty
+* Implement rhythmic motifs
+* Regularly delete motifs
+* Make P more user-friendly for those who can't edit Max files
+* Write a script to launch P, f, and Q
+* Make usage curses optional (with a flag?)
+* Get output and input parsers out of global namespace
 
 ## Contributing
 
