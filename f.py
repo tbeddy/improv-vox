@@ -1,8 +1,7 @@
 """
-TIM'S FREE IMPROVISER
 Written in Python 3.5.1
 
-The goal of this project is to receive information that has been extracted 
+The goal of this file is to receive information that has been extracted 
 from real-time monophonic audio and output similar information for use with 
 a software synthesizer.
 
@@ -13,21 +12,16 @@ For the current version of this protocol (0.1), these are:
 -velocity (int)
 -MFCC (four floats)
 
-Future features:
--Determine melodic and rhythmic motifs/patterns from input and incorporate them into output
--Develop output stream that motifs can be incorporated into
--Actually ouput the data over OSC
--Possibly develop a fixed compositional framework for the improvisation
-
 MIT License (c) Tim Bedford
 """
 
 import argparse
 import math
+import curses
 from queue import Queue
 from time import time
 from collections import Counter
-from copy import deepcopy, copy
+from copy import deepcopy
 from random import random, randint, randrange, choice, expovariate
 from music21 import *
 from pythonosc import dispatcher, osc_server, osc_message_builder, udp_client
@@ -47,6 +41,41 @@ last_time = time()*1000.0      #The last time the time was checked
 next_duration = 1000           #If this duration is passed, then next note will be sent to output
 lowest_pitch = 45              #Lowest pitch the system is allowed to make
 highest_pitch = 70             #Highest pitch the system is allowed to make
+
+
+stdscr = curses.initscr()      #Initialize curses
+curses.noecho()
+curses.cbreak()
+term_height = curses.LINES     #Terminal height
+term_width = curses.COLS       #Terminal width
+
+input_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, 0)
+motif_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, term_width//4)
+filler_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, term_width//2)
+output_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, (term_width*3)//4)
+info_win = stdscr.subwin(term_height//8, term_width, (term_height*7)//8, 0)
+
+#Add a border to each window
+input_win.border()
+motif_win.border()
+filler_win.border()
+output_win.border()
+info_win.border()
+
+#Give each window a descriptive title
+input_win.addstr(1, (term_width//8)-3, "Input")
+motif_win.addstr(1, (term_width//8)-3, "Motifs")
+filler_win.addstr(1, (term_width//8)-3, "Filler")
+output_win.addstr(1, (term_width//8)-3, "Output")
+
+#Move each window's cursor down one line to avoid erasing title
+input_win.move(2, 0)
+motif_win.move(2, 0)
+filler_win.move(2, 0)
+output_win.move(2, 0)
+
+#Make all the changes to curses visible
+stdscr.refresh()
 
 
 #This section is to establish the "client" (the part of the program sending
@@ -83,7 +112,7 @@ def store_new_note(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4)
                       quantize_duration(duration), #quantize duration before being stored
                       velocity,
                       c1, c2, c3, c4)
-    print("INPUT NOTE: {}".format(new_note))
+    #print("INPUT NOTE: {}".format(new_note))
     human_all_notes.append(new_note)
 
 def queue_next_motif(unused_addr, args):
@@ -98,7 +127,6 @@ def queue_next_motif(unused_addr, args):
         selected_motif = motif_pool_pitches[motif_index]
         for current_note in selected_motif:
             note_queue.put(current_note)
-        #print("QUEUED")
 
 def retrieve_next_note(unused_addr, args):
     """
@@ -139,7 +167,7 @@ def motif_detection(notelist, parameter):
     -The longest pattern found more than once is returned
     -Pattern length can be anywhere from two notes to half the length of notelist
     """
-    global notelist_size, human_all_notes
+    global notelist_size, human_all_notes, motif_pool_pitches
     if (parameter == "duration"):
         note_parameter_list = [quantize_duration(n.duration) for n in notelist]
     elif (parameter == "pitch"):
@@ -163,7 +191,9 @@ def motif_detection(notelist, parameter):
             for p in most_common_motifs[0]:
                 best_motif.append(MyNote(p, 500, 60, 0.0, 0.0, 0.0, 0.0))
             motif_pool_pitches.append(best_motif)
-        print("DETECTED: {}".format(most_common_motifs[0]))
+        return most_common_motifs[0]
+    else:
+        return []
     
 def quantize_duration(dur):
     """
@@ -209,14 +239,13 @@ def generate_motif():
                               random(), random(), random(), random())
         new_motif.append(current_note)
     motif_pool_pitches.append(new_motif)
-    print("GENERATED MOTIF: {}".format(new_motif))
+    motif_to_screen(new_motif)
 
 def permutate_motif(motif):
     """
     -Randomly apply one of the permutation functions to the motif
     """
-    func_num = randint(1, 3) #don't make the tuning functions available yet
-    #func_num = 4
+    func_num = randint(1, 4) #don't make the tuning functions available yet
     if (func_num == 1):
         #print("RETROGRADE")
         return retrograde(motif)
@@ -283,8 +312,8 @@ def transform_pitch(motif):
     new_motif = deepcopy(motif)
     transform_point = randint(0, len(new_motif)-1)                       #pick a random point in the motif to transform
     old_pitch = new_motif[transform_point].pitch
-    possible_pitches = [i for i in range(lowest_pitch, old_pitch)] + \   #pitches available (that aren't the old pitch)
-                       [i for i in range(old_pitch+1, highest_pitch)]
+    possible_pitches = ([i for i in range(lowest_pitch, old_pitch)] +    #pitches available (that aren't the old pitch)
+                        [i for i in range(old_pitch+1, highest_pitch)])
     new_pitch = choice(possible_pitches)
     new_motif[transform_point].pitch = new_pitch
     return new_motif
@@ -377,29 +406,41 @@ def osc_generate_motif(unused_addr, args):
 
 def osc_permutate_motif(unused_addr, args):
     global motif_pool_pitches
-
-    print("MOTIFS:")
-    for m in motif_pool_pitches:
-        print(m)
     
     old_motif = choice(motif_pool_pitches)
     new_motif = permutate_motif(old_motif)        #generate a new motif by permutating one of the saved motifs
-
-    #print("SAME???? {}".format(old_motif == new_motif))
     
     while (new_motif in motif_pool_pitches):      #if the new motif has already been generated, generate a new motif
         new_motif = permutate_motif(choice(motif_pool_pitches))
+        
     motif_pool_pitches.append(new_motif)
+    motif_to_screen(new_motif)
 
 def osc_motif_detection(unused_addr, args):
-    global human_all_notes
+    global human_all_notes, motif_pool_pitches
     notelist = human_all_notes[(-1 * notelist_size):] #grab a set number of notes last played by human
     #parameter = choice(["pitch", "duration"]) #randomly choose to look for melodic or rhythmic motifs
     parameter = "pitch"
-    motif_detection(notelist, parameter)
+    new_motif = motif_detection(notelist, parameter)
+
+    if new_motif:                                   #If motif_detection was able to find a new motif...
+        motif_pool_pitches.append(new_motif)        #...store it...
+        motif_to_screen(new_motif)                  #...and print it to the window
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~Curses~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#These functions are for managing the pseudo-GUI
+
+def motif_to_screen(motif):
+    cur_y, cur_x = motif_win.getyx()           #Grab the cursor's current x and y positions
+    motif_win.addstr(cur_y, cur_x, str(motif)) #Print the motif to the window
+    motif_win.move(cur_y+1, cur_x)             #Move the cursor to the next line for next time
+    motif_win.border()                         #Re-draw the border
+    motif_win.refresh()                        #Refresh the window
 
 
 #~~~~~~~~~~~~~~~~~~~~~Initialize~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 if __name__ == "__main__":
     input_parser = argparse.ArgumentParser()
     input_parser.add_argument("--ip", default="127.0.0.1", help="The ip to listen on")
@@ -422,5 +463,7 @@ if __name__ == "__main__":
     #Launches the server and continues to run until manually ended
     server = osc_server.ThreadingOSCUDPServer(
         (input_args.ip, input_args.port), dispatcher)
-    print("Serving on {}".format(server.server_address))
+    #print("Serving on {}".format(server.server_address))
+    info_win.addstr(term_height//16, (term_width//2)-12, "Serving on {}".format(server.server_address))    #Print the OSC address in the info_win window
+    info_win.refresh()
     server.serve_forever()
