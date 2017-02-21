@@ -37,7 +37,7 @@ To use the system:
 * Regularly delete motifs
 * Make P more user-friendly for those who can't edit Max files
 * Write a script to launch P, f, and Q
-* Make usage curses optional (with a flag?)
+* Make curses usage optional (with a flag?)
 * Get output and input parsers out of global namespace
 
 ## Contributing
