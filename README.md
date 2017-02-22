@@ -36,7 +36,6 @@ To use the system:
 * Implement rhythmic motifs
 * Regularly delete motifs
 * Make P more user-friendly for those who can't edit Max files
-* Write a script to launch P, f, and Q
 * Make curses usage optional (with a flag?)
 * Get output and input parsers out of global namespace
 
