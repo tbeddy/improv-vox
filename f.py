@@ -6,11 +6,11 @@ from real-time monophonic audio and output similar information for use with
 a software synthesizer.
 
 Information is received as a series of values that describe a note.
-For the current version of this protocol (0.1), these are:
+For the current version of this protocol, these are:
 -pitch/frequency (float) (in range of 50.0 to 400.0)
 -duration in milliseconds (int)
 -velocity (int)
--MFCC (four floats)
+-formants (four integers)
 
 MIT License (c) Tim Bedford
 """
@@ -18,87 +18,44 @@ MIT License (c) Tim Bedford
 import argparse
 import math
 import curses
+import signal
+import sys
 from queue import Queue
 from time import time
 from collections import Counter
 from copy import deepcopy
-from random import random, randint, randrange, choice, expovariate
 from music21 import *
+from random import random, randint, randrange, choice, expovariate, uniform
 from pythonosc import dispatcher, osc_server, osc_message_builder, udp_client
 from note_class import MyNote
 
-input_OSC_port = 5005
-output_OSC_port = 6006
+input_OSC_port = 5005          #The OSC port to receive data from P
+output_OSC_port = 6006         #The OSC port to send data to Q
+lowest_pitch = 45              #Lowest pitch the system is allowed to make
+highest_pitch = 70             #Highest pitch the system is allowed to make
+f1min = 250
+f1max = 700
+f2min = 550
+f2max = 1900
+f3min = 2550
+f3max = 2850
+f4min = 2750
+f4max = 3250
+f5min = 3000
+f5max = 3600
 
 human_all_notes = []           #All notes played by the human
 motif_pool_pitches = []        #Pitched motifs derived from these notes
 motif_pool_durations = []      #Rhythmics motifs derived from these notes
 note_queue = Queue()           #Notes queued up to be output
-notelist_size = 10             #Number of notes to check when using motf_detection
-motdet_pace = 5                #Number of notes passed until motif_detection is invoked
-motdet_count = 0               #Moves up every time note is stored, reset once motif_detection_pace is reached
+notelist_size = 10             #Number of notes to check when using motif_detection
 last_time = time()*1000.0      #The last time the time was checked
 next_duration = 1000           #If this duration is passed, then next note will be sent to output
-lowest_pitch = 45              #Lowest pitch the system is allowed to make
-highest_pitch = 70             #Highest pitch the system is allowed to make
-
-
-stdscr = curses.initscr()      #Initialize curses
-curses.noecho()
-curses.cbreak()
-term_height = curses.LINES     #Terminal height
-term_width = curses.COLS       #Terminal width
-
-input_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, 0)
-motif_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, term_width//4)
-filler_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, term_width//2)
-output_win = stdscr.subwin((term_height*7)//8, term_width//4, 0, (term_width*3)//4)
-info_win = stdscr.subwin(term_height//8, term_width, (term_height*7)//8, 0)
-
-#Add a border to each window
-input_win.border()
-motif_win.border()
-filler_win.border()
-output_win.border()
-info_win.border()
-
-#Give each window a descriptive title
-input_win.addstr(1, (term_width//8)-3, "Input")
-motif_win.addstr(1, (term_width//8)-3, "Motifs")
-filler_win.addstr(1, (term_width//8)-3, "Filler")
-output_win.addstr(1, (term_width//8)-3, "Output")
-
-#Move each window's cursor down one line to avoid erasing title
-input_win.move(2, 0)
-motif_win.move(2, 0)
-filler_win.move(2, 0)
-output_win.move(2, 0)
-
-#Make all the changes to curses visible
-stdscr.refresh()
-
-
-#This section is to establish the "client" (the part of the program sending
-#OSC data). It will be reorganized soon, since all of these variables
-#probably shouldn't be global.
-output_parser = argparse.ArgumentParser()
-output_parser.add_argument("--ip", default="127.0.0.1", help="The ip of the OSC server")
-output_parser.add_argument("--port", type=int, default=output_OSC_port ,help="The port the OSC server is listening on")
-output_args = output_parser.parse_args()     
-output_client = udp_client.UDPClient(output_args.ip, output_args.port)
-
-#This is the client for receiving my own messages, not outputting them to the synth
-output_parser2 = argparse.ArgumentParser()
-output_parser2.add_argument("--ip", default="127.0.0.1", help="The ip of the OSC server")
-output_parser2.add_argument("--port", type=int, default=input_OSC_port ,help="The port the OSC server is listening on")
-output_args2 = output_parser2.parse_args()     
-input_client = udp_client.UDPClient(output_args2.ip, output_args2.port)
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~Storing/Retrieving~~~~~~~~~~~~~~~~~~~~~~
 #These functions are for storing notes and using them when needed.
 
-def store_new_note(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4):
+def store_new_note(unused_addr, pitch, duration, velocity, f1, f2, f3, f4, f5):
     """
     -Stores incoming notes in as they are received
     -Receives notes as series of seven parameters:
@@ -108,38 +65,40 @@ def store_new_note(unused_addr, args, pitch, duration, velocity, c1, c2, c3, c4)
        -four coefficients derived from the mel-frequency cepstrum of the signal
     """
     global human_all_notes
-    new_note = MyNote(pitch,
+    new_note = MyNote(int(pitch),
                       quantize_duration(duration), #quantize duration before being stored
                       velocity,
-                      c1, c2, c3, c4)
-    #print("INPUT NOTE: {}".format(new_note))
+                      f1, f2, f3, f4, f5)
     human_all_notes.append(new_note)
+    input_to_screen(new_note)
 
-def queue_next_motif(unused_addr, args):
+def queue_next_motif(unused_addr):
     """
-    -Picks a motif if less than 20 notes in note_queue
+    -Picks a motif if less than 5 notes in note_queue
     -Weighted towards those motifs more recently added
     -Puts each of the notes of the motif in the global note_queue
     """
     global motif_pool_pitches, note_queue
-    if (note_queue.qsize() < 20):
+    if (note_queue.qsize() < 5):
         motif_index = (len(motif_pool_pitches)-1) - int(len(motif_pool_pitches)*expovariate(3.0))
         selected_motif = motif_pool_pitches[motif_index]
         for current_note in selected_motif:
             note_queue.put(current_note)
+        queue_to_screen("{}/{}".format(motif_index, len(motif_pool_pitches)))
 
-def retrieve_next_note(unused_addr, args):
+def retrieve_next_note(unused_addr):
     """
     -Pops next note from note_queue and uses send_note function on it
     """
-    global next_duration, last_time
+    global next_duration, last_time, note_queue
     current_time = time()*1000.0 #check the current time, multiply by 1000.0 to get milliseconds
     if (next_duration <= (current_time - last_time)):
         current_note = note_queue.get()
-        #print("OUTPUT NOTE: {}".format(current_note))
+        next_duration = current_note.duration
         send_note(current_note)
-        next_duration = note_queue.queue[0].duration #store next note's duration without popping note
-        last_time = current_time
+        output_to_screen(current_note)
+        #last_time = current_time
+        last_time = time()*1000.0
 
 def send_note(this_note):
     """
@@ -148,14 +107,14 @@ def send_note(this_note):
     msg = osc_message_builder.OscMessageBuilder(address = "/note")
     msg.add_arg(this_note.pitch)
     msg.add_arg(this_note.duration)
-    #msg.add_arg(this_note.velocity)
-    #msg.add_arg(this_note.mfcc[0])
-    #msg.add_arg(this_note.mfcc[1])
-    #msg.add_arg(this_note.mfcc[2])
-    #msg.add_arg(this_note.mfcc[3])
+    msg.add_arg(this_note.velocity)
+    msg.add_arg(this_note.timbre[0])
+    msg.add_arg(this_note.timbre[1])
+    msg.add_arg(this_note.timbre[2])
+    msg.add_arg(this_note.timbre[3])
+    msg.add_arg(this_note.timbre[4])
     msg = msg.build()
     output_client.send(msg)
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Analysis~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #These functions are for analyzing notes or phrases.
@@ -169,7 +128,7 @@ def motif_detection(notelist, parameter):
     """
     global notelist_size, human_all_notes, motif_pool_pitches
     if (parameter == "duration"):
-        note_parameter_list = [quantize_duration(n.duration) for n in notelist]
+        note_parameter_list = [n.duration for n in notelist]
     elif (parameter == "pitch"):
         note_parameter_list = [n.pitch for n in notelist]
     subnotelist_coll = [] #store every note sequence at least two notes long here
@@ -184,14 +143,14 @@ def motif_detection(notelist, parameter):
         if (parameter == "duration"):
             best_motif = []
             for d in most_common_motifs[0]:
-                best_motif.append(MyNote(60, d, 60, 0.0, 0.0, 0.0, 0.0))
+                best_motif.append(MyNote(60, d, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0))
             motif_pool_durations.append(best_motif)
         elif (parameter == "pitch"):
             best_motif = []
             for p in most_common_motifs[0]:
-                best_motif.append(MyNote(p, 500, 60, 0.0, 0.0, 0.0, 0.0))
+                best_motif.append(MyNote(p, 500, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0))
             motif_pool_pitches.append(best_motif)
-        return most_common_motifs[0]
+        return best_motif
     else:
         return []
     
@@ -208,18 +167,12 @@ def quantize_duration(dur):
     else:
         return int(round(dur / 500.0) * 500.0)
 
-def midi_num_to_note(i):
-    x = pitch.Pitch()
-    x.midi = i
-    return x.nameWithOctave
-
 def pitch_range(phrase):
     """ 
     -Finds range between highest and lowest pitch in phrase
     """
     fe = features.jSymbolic.RangeFeature(phrase)
     return fe.extract().vector[0]
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~Generative Functions~~~~~~~~~~~~~~~~~~~~~~
 #These functions are for the purpose of generating new material.
@@ -235,8 +188,13 @@ def generate_motif():
     for i in range(phrase_length): #generate several notes and append each to the stream
         current_note = MyNote(randint(lowest_pitch, highest_pitch), #baritone-ish voice range in MIDI values
                               randrange(500, 1501, 500), #duration already quantized
-                              randint(60, 90),
-                              random(), random(), random(), random())
+                              #uniform(-30.0, 0.0), #if using decibals
+                              uniform(1.0, 1.0),
+                              randint(f1min,f1max),
+                              randint(f2min,f2max),
+                              randint(f3min,f3max),
+                              randint(f4min,f4max),
+                              randint(f5min,f5max))
         new_motif.append(current_note)
     motif_pool_pitches.append(new_motif)
     motif_to_screen(new_motif)
@@ -307,7 +265,7 @@ def stretch(motif, degree):
 
 def transform_pitch(motif):
     """
-    -randomly transform one pitch
+    -Randomly transforms one pitch
     """
     new_motif = deepcopy(motif)
     transform_point = randint(0, len(new_motif)-1)                       #pick a random point in the motif to transform
@@ -396,15 +354,14 @@ def make_phrase_intune(motif):
         new_motif.append(make_note_intune(n))
     return new_motif
 
-
 #~~~~~~~~~~~~~~~~~~~~OSC Functions~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #These functions are only called through OSC messages.
 #Their purpose is to call similarly named functions without the baggage of OSC addresses as inputs.
 
-def osc_generate_motif(unused_addr, args):
+def osc_generate_motif(unused_addr):
     generate_motif()
 
-def osc_permutate_motif(unused_addr, args):
+def osc_permutate_motif(unused_addr):
     global motif_pool_pitches
     
     old_motif = choice(motif_pool_pitches)
@@ -416,7 +373,7 @@ def osc_permutate_motif(unused_addr, args):
     motif_pool_pitches.append(new_motif)
     motif_to_screen(new_motif)
 
-def osc_motif_detection(unused_addr, args):
+def osc_motif_detection(unused_addr):
     global human_all_notes, motif_pool_pitches
     notelist = human_all_notes[(-1 * notelist_size):] #grab a set number of notes last played by human
     #parameter = choice(["pitch", "duration"]) #randomly choose to look for melodic or rhythmic motifs
@@ -425,23 +382,109 @@ def osc_motif_detection(unused_addr, args):
 
     if new_motif:                                   #If motif_detection was able to find a new motif...
         motif_pool_pitches.append(new_motif)        #...store it...
-        motif_to_screen(new_motif)                  #...and print it to the window
-
+        detect_to_screen(new_motif)                 #...and print it to the window
 
 #~~~~~~~~~~~~~~~~~~~~~~~Curses~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #These functions are for managing the pseudo-GUI
 
+def info_check(s):
+    info_win.addstr("{}".format(s))
+    info_win.refresh()
+
+def setup_window(window, title):
+    window.border()
+    window.addstr(1, (term_width//8)-3, title)
+    window.move(2, 1)
+
 def motif_to_screen(motif):
-    cur_y, cur_x = motif_win.getyx()           #Grab the cursor's current x and y positions
-    motif_win.addstr(cur_y, cur_x, str(motif)) #Print the motif to the window
-    motif_win.move(cur_y+1, cur_x)             #Move the cursor to the next line for next time
-    motif_win.border()                         #Re-draw the border
-    motif_win.refresh()                        #Refresh the window
+    cur_y, cur_x = motif_win.getyx()            #Grab the cursor's current x and y positions
+    motif_win.addstr(cur_y, cur_x, str(motif))  #Print the motif to the window
+    motif_win.move(cur_y+1, cur_x)              #Move the cursor to the next line for next time
+    motif_win.border()                          #Re-draw the border
+    motif_win.refresh()                         #Refresh the window
+
+def detect_to_screen(motif):
+    cur_y, cur_x = filler_win.getyx()           #Grab the cursor's current x and y positions
+    filler_win.addstr(cur_y, cur_x, str(motif)) #Print the motif to the window
+    filler_win.move(cur_y+1, cur_x)             #Move the cursor to the next line for next time
+    filler_win.border()                         #Re-draw the border
+    filler_win.refresh()                        #Refresh the window
+
+def input_to_screen(note):
+    input_win.deleteln()
+    input_win.insertln()
+    input_win.addstr(2, 1, str(note))
+    input_win.border()
+    input_win.refresh()
+
+def output_to_screen(note):
+    output_win.deleteln()
+    output_win.insertln()
+    output_win.addstr(2, 1, str(note))
+    output_win.border()
+    output_win.refresh()
+
+def queue_to_screen(q):
+    queue_win.deleteln()
+    queue_win.insertln()
+    queue_win.addstr(2, 1, q)
+    queue_win.border()
+    queue_win.refresh()
+
+
+def signal_handler(signal, frame):
+    """
+    -Ends curses and then the entire program
+    -Adapted from Johan Kotlinski's answer to this question:
+        -https://stackoverflow.com/questions/4205317/capture-keyboardinterrupt-in-python-without-try-except
+    """
+    curses.endwin()
+    sys.exit(0)
 
 
 #~~~~~~~~~~~~~~~~~~~~~Initialize~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if __name__ == "__main__":
+    stdscr = curses.initscr()      #Initialize curses
+    curses.noecho()
+    curses.cbreak()
+    term_height = curses.LINES     #Terminal height
+    term_width = curses.COLS       #Terminal width
+
+    #Create several subwindows to visualize data in the terminal
+    input_win = stdscr.subwin(   term_height//4,     term_width//4, 0,                  0)
+    output_win = stdscr.subwin(  term_height//4,     term_width//4, term_height//4,     0)
+    motif_win = stdscr.subwin(   (term_height*7)//8, term_width//4, 0,                  term_width//4)
+    filler_win = stdscr.subwin(  (term_height*7)//8, term_width//4, 0,                  term_width//2)
+    info_win = stdscr.subwin(    term_height//8,     term_width,    (term_height*7)//8, 0)
+    queue_win = stdscr.subwin(   (term_height*7)//8, term_width//4, 0,                  (term_width*3)//4)
+
+    #Setup each window (border, title)
+    setup_window(input_win, "Input")
+    setup_window(output_win, "Output")
+    setup_window(motif_win, "Motifs")
+    setup_window(filler_win, "Filler")
+    setup_window(queue_win, "Queue")
+    setup_window(info_win, "Info")
+    
+    stdscr.refresh()             #Make all the changes to curses visible
+
+    #This section is to establish the "client" (the part of the program sending OSC data)
+    output_parser = argparse.ArgumentParser()
+    output_parser.add_argument("--ip", default="127.0.0.1", help="The ip of the OSC server")
+    output_parser.add_argument("--port", type=int, default=output_OSC_port ,help="The port the OSC server is listening on")
+    output_args = output_parser.parse_args()     
+    output_client = udp_client.UDPClient(output_args.ip, output_args.port)
+
+    """
+    #This is the client for receiving my own messages, not outputting them to the synth
+    output_parser2 = argparse.ArgumentParser()
+    output_parser2.add_argument("--ip", default="127.0.0.1", help="The ip of the OSC server")
+    output_parser2.add_argument("--port", type=int, default=input_OSC_port ,help="The port the OSC server is listening on")
+    output_args2 = output_parser2.parse_args()     
+    input_client = udp_client.UDPClient(output_args2.ip, output_args2.port)
+    """
+    
     input_parser = argparse.ArgumentParser()
     input_parser.add_argument("--ip", default="127.0.0.1", help="The ip to listen on")
     input_parser.add_argument("--port", type=int, default=input_OSC_port, help="The port to listen on")
@@ -450,20 +493,22 @@ if __name__ == "__main__":
     #Dispatcher "listens" on these addresses and sends any matching information
     #to the designated function
     dispatcher = dispatcher.Dispatcher()
-    dispatcher.map("/note", store_new_note, "note") #receives note from input
-    dispatcher.map("/motifdetection", osc_motif_detection, "note")
-    dispatcher.map("/queuenextmotif", queue_next_motif, "note")
-    dispatcher.map("/generatemotif", osc_generate_motif, "note")
-    dispatcher.map("/retrievenextnote", retrieve_next_note, "note")
-    dispatcher.map("/permutatemotif", osc_permutate_motif, "note")
+    dispatcher.map("/note", store_new_note) #receives note from input
+    dispatcher.map("/motifdetection", osc_motif_detection)
+    dispatcher.map("/queuenextmotif", queue_next_motif)
+    dispatcher.map("/generatemotif", osc_generate_motif)
+    dispatcher.map("/retrievenextnote", retrieve_next_note)
+    dispatcher.map("/permutatemotif", osc_permutate_motif)
 
     for i in range(randint(1,3)): #generate a few motifs to start out
         generate_motif()
         
     #Launches the server and continues to run until manually ended
-    server = osc_server.ThreadingOSCUDPServer(
-        (input_args.ip, input_args.port), dispatcher)
-    #print("Serving on {}".format(server.server_address))
+    server = osc_server.ThreadingOSCUDPServer((input_args.ip, input_args.port), dispatcher)
+    
     info_win.addstr(term_height//16, (term_width//2)-12, "Serving on {}".format(server.server_address))    #Print the OSC address in the info_win window
     info_win.refresh()
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    
     server.serve_forever()
