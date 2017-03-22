@@ -177,14 +177,6 @@ def quantize_duration(dur):
         return int(round(dur / 500.0) * 500.0)
 
 
-def pitch_range(phrase):
-    """
-    -Finds range between highest and lowest pitch in phrase
-    """
-    fe = features.jSymbolic.RangeFeature(phrase)
-    return fe.extract().vector[0]
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~Generative Functions~~~~~~~~~~~~~~~~~~~~~~
 # These functions are for the purpose of generating new material.
 
