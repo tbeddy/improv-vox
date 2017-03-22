@@ -30,14 +30,35 @@ To use the system:
 
 ## TODO
 
-* Make OSC usage in f more consistent
-* Finish implementing curses
-* Make the docs/comments more consistent and pretty
-* Implement rhythmic motifs
-* Regularly delete motifs
-* Make P more user-friendly for those who can't edit Max files
-* Make curses usage optional (with a flag?)
-* Get output and input parsers out of global namespace
+- Make the docs/comments more consistent and pretty
+- Implement rhythmic motifs
+- Regularly delete motifs
+- Make P more user-friendly for those who can't edit Max files
+- Write more thorough, Pythonic docstrings for functions:
+  * store_new_note
+  * queue_next_motif
+  * retrieve_next_note
+  * send_note
+  * motif_detection
+  * quantize_duration
+  * generate_motif
+  * permutate_motif
+  * retograde
+  * transpose
+  * stretch
+  * transform_pitch
+  * add_flourish
+  * osc_generate_motif
+  * osc_permutate_motif
+  * osc_motif_detection
+  * info_check
+  * setup_window
+  * motif_to_screen
+  * detect_to_screen
+  * input_to_screen
+  * output_to_screen
+  * queue_to_screen
+  * signal_handler
 
 ## Contributing
 
