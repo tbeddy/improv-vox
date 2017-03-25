@@ -514,20 +514,20 @@ def info_check(s):
 def setup_window(window, title):
     """Setup a window for later use.
 
-    Create a window's border, display the window's title, and move the cursor
+    Create a window's border. Display the window's title at the top of
+    the window, just underneath the border and centered. Move the cursor
     away from the title (so it isn't erased later).
 
-    TODO: more accurate way of centering title
-
     Arguments:
-      window(curses subwindow)
+      window(curses window)
       title(str)
 
     Returns:
       None
     """
     window.border()
-    window.addstr(1, (term_width//8)-3, title)
+    height, width = window.getmaxyx()
+    window.addstr(1, (width//2)-(len(title)//2), title)
     window.move(2, 1)
 
 
