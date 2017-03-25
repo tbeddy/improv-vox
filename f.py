@@ -62,28 +62,58 @@ next_duration = 1000           # If this duration is passed, then next note will
 # These functions are for storing notes and using them when needed.
 
 
-def store_new_note(unused_addr, pitch, duration, velocity, f1, f2, f3, f4, f5):
+def store_new_note(unused_addr, pitch, duration, amplitude, f1, f2, f3, f4, f5):
     """Store incoming notes as they are received.
 
-    Notes are received as eight arguments
-    pitch (int): this should exist as the first
-    duration (int)
-    The final five values
+    The note is stored in the global list human_all_notes in the custom class
+    MyNote. It is then displayed in its own window in the curses interface.
+
+    f1 through f5 are input as separate arguments because of problems with the
+    program sending values to this program. If those problems are fixed, those
+    five arguments will likely be rewritten as a single list.
+
+    Arguments (various parameters of the note):
+      pitch (int): This should be in MIDI pitch format.
+         e.g. 60 (equivalent to C5)
+      duration (int): This should be in milliseconds(ms). It will be quantized 
+         (i.e. rounded to the nearest 500 ms) before being stored.
+         e.g. 850 (equivalent to 0.850 seconds)
+         This will be stored as 1000.
+      amplitude (float): This can be thought of as the note's volume. It can 
+         be any value from 0.0 (complete silence).
+         to 1.0 (full volume).
+         e.g. 0.7
+      f1, f2, f3, f4, f5 (int): These five formants represent the note's timbre.
+         e.g. 300, 1000, 2600, 3000, 3400
+
+    Returns:
+      None
     """
     global human_all_notes
     new_note = MyNote(int(pitch),
                       quantize_duration(duration),
-                      velocity,
+                      amplitude,
                       f1, f2, f3, f4, f5)
     human_all_notes.append(new_note)
     input_to_screen(new_note)
 
 
 def queue_next_motif(unused_addr):
-    """
-    -Picks a motif if less than 5 notes in note_queue
-    -Weighted towards those motifs more recently added
-    -Puts each of the notes of the motif in the global note_queue
+    """Queue the next motif to be sent to Q.
+    
+    If only 5 notes are in note_queue, one of the motifs in motif_pool_pitches
+    is selected and each note is individually added to note_queue. More recent
+    motifs are more likely to be selected.
+
+    Once rhythmic motifs are added, this function will become more complicated
+    as it will have to create truly new notes, not just notes with all but one
+    of their parameters fixed.
+
+    Arguments:
+      None
+
+    Returns:
+      None
     """
     global motif_pool_pitches, note_queue
     repetitions = randint(2, 7)
@@ -93,13 +123,25 @@ def queue_next_motif(unused_addr):
         for i in range(repetitions):
             for current_note in selected_motif:
                 note_queue.put(current_note)
-        queue_to_screen("{}/{}".format(motif_index, len(motif_pool_pitches)))
+        #queue_to_screen("{}/{}".format(motif_index, len(motif_pool_pitches)))
 
 
 def retrieve_next_note(unused_addr):
-    """Pop the next note from note_queue and apply send_note function to it."""
+    """Output the next note in the queue.
+
+    If the current note has finished sounding, then the next note in note_queue 
+    is sent to Q and displayed in its own window in the curses interface.
+
+    This function should be called from outside the program as often as possible.
+
+    Arguments:
+      None
+
+    Returns:
+      None
+    """
     global next_duration, last_time, note_queue
-    current_time = time()*1000.0  # Check the current time, multiply by 1000.0 to get milliseconds
+    current_time = time()*1000.0  # Convert from seconds to milliseconds
     if (next_duration <= (current_time - last_time)):
         current_note = note_queue.get()
         next_duration = current_note.duration
@@ -109,7 +151,17 @@ def retrieve_next_note(unused_addr):
 
 
 def send_note(this_note):
-    """Send each of the parameters of a note as the arguments of an OSC message."""
+    """Send a note to Q.
+
+    Each of the parameters of the note are individually added as arguments
+    to an OSC message.
+
+    Arguments:
+      this_note(MyNote)
+
+    Returns:
+      None
+    """
     msg = osc_message_builder.OscMessageBuilder(address="/note")
     msg.add_arg(this_note.pitch)
     msg.add_arg(this_note.duration)
@@ -164,10 +216,16 @@ def motif_detection(notelist, parameter):
 
 
 def quantize_duration(dur):
-    """
-    -Makes a note's duration closer to a standard set of possible notes
-    -Adapted from Sven Marnach's answer to this question:
+    """Quantize the duration to the nearest 500 milliseconds.
+    
+    This function was adapted from Sven Marnach's answer to this question:
        http://stackoverflow.com/questions/9810391/round-to-the-nearest-500-python
+
+    Arguments:
+      dur(int)
+
+    Returns:
+      An int
     """
     if (dur <= 500):
         return 500
@@ -182,9 +240,17 @@ def quantize_duration(dur):
 
 
 def generate_motif():
-    """
-    -Creates randomized motif
-    -Should have no relation to anything the vocalist is doing
+    """Generate a random motif.
+
+    Add a new motif to motif_pool_pitches. The motif is two to five notes long 
+    and all of the notes' parameters are randomized. The motif should have no 
+    relation to anything the vocalist is doing.
+
+    Arguments:
+      None
+
+    Returns:
+      None
     """
     global motif_pool_pitches, motif_pool_durations
     new_motif = []
@@ -204,10 +270,15 @@ def generate_motif():
 
 
 def permutate_motif(motif):
+    """Randomly apply one of the permutation functions to a motif.
+
+    Arguments:
+      motif(list of MyNotes)
+
+    Returns:
+      A list of MyNotes
     """
-    -Randomly apply one of the permutation functions to the motif
-    """
-    func_num = randint(1, 4)                      # (Don't make the tuning functions available yet)
+    func_num = randint(1, 4)  # (Don't make the tuning functions available yet)
     if (func_num == 1):
         return retrograde(motif)
     elif (func_num == 2):
@@ -226,9 +297,15 @@ def permutate_motif(motif):
 
 
 def retrograde(motif):
-    """
-    -Reverses order of notes in phrase
-    -Does not alter any of notes' parameters
+    """Reverse the order of notes in a motif.
+
+    None of the notes' parameters are altered.
+
+    Arguments:
+      motif(list of MyNotes)
+
+    Returns:
+      A list of MyNotes
     """
     new_motif = []
     for i in range(len(motif)-1, -1, -1):
@@ -237,10 +314,16 @@ def retrograde(motif):
 
 
 def transpose(motif, interval):
-    """
-    -Raises every note in phrase by designated interval
-    -Only alters frequency/pitch parameter
-    -Interval must be an integer
+    """Raise every note in a motif by a designated interval.
+
+    Only the notes' pitch parameters are altered.
+
+    Arguments:
+      motif(list of MyNotes)
+      interval(int)
+
+    Returns:
+      A list of MyNotes
     """
     new_motif = deepcopy(motif)     # Make new motif from deepcopy of original motif
     for current_note in new_motif:
@@ -249,11 +332,17 @@ def transpose(motif, interval):
 
 
 def stretch(motif, degree):
-    """
-    -Stretches (or shrinks) phrase duration
-    -Equally stretches each note
-    -Use float between 0.0 and 1.0 to shrink
-    -Only alters duration parameter
+    """Uniformly stretch (or shrink) motif.
+    
+    Every note is stretched/shrunk the same degree. Only the notes' duration
+    parameter is altered. 
+
+    Arguments:
+      motif(list of MyNotes)
+      degree(float)
+
+    Returns:
+      A list of MyNotes
     """
     if (any(n.duration > 2000 for n in motif)) and (degree >= 1.0):    # Don't stretch motifs with very long notes
         degree = choice([0.25, 0.5])
@@ -266,8 +355,16 @@ def stretch(motif, degree):
 
 
 def transform_pitch(motif):
-    """
-    -Randomly transforms one pitch
+    """Randomly transform the pitch of one note in a motif.
+
+    The new pitch can be anywhere from lowest_pitch to highest_pitch, as long
+    as it isn't the same as the old pitch.
+
+    Arguments:
+      -motif(list of MyNotes)
+
+    Returns:
+      A list of MyNotes
     """
     new_motif = deepcopy(motif)
     transform_point = randint(0, len(new_motif)-1)                       # Pick a random point in the motif to transform
@@ -280,9 +377,7 @@ def transform_pitch(motif):
 
 
 def add_flourish(motif):
-    """
-    -Adds one note to a phrase in the same key
-    """
+    """Add one note to a phrase in the same key."""
     motif_stream = stream.Stream()                  # Extract pitch info from motif into music21 stream
     for n in motif:
         current_note = note.Note()                  # Create new note
@@ -367,6 +462,7 @@ def make_phrase_intune(motif):
 
 
 def osc_generate_motif(unused_addr):
+    """Call the generate_motif functon."""
     generate_motif()
 
 
@@ -400,11 +496,36 @@ def osc_motif_detection(unused_addr):
 
 
 def info_check(s):
+    """Send any information to a small window in the curses interface.
+
+    This function is designed for testing. It's meant to take the place of
+    the standard print function when using curses.
+
+    Arguments:
+      s(str)
+
+    Returns:
+      None
+    """
     info_win.addstr("{}".format(s))
     info_win.refresh()
 
 
 def setup_window(window, title):
+    """Setup a window for later use.
+
+    Create a window's border, display the window's title, and move the cursor
+    away from the title (so it isn't erased later).
+
+    TODO: more accurate way of centering title
+
+    Arguments:
+      window(curses subwindow)
+      title(str)
+
+    Returns:
+      None
+    """
     window.border()
     window.addstr(1, (term_width//8)-3, title)
     window.move(2, 1)
@@ -451,8 +572,8 @@ def queue_to_screen(q):
 
 
 def signal_handler(signal, frame):
-    """
-    -Ends curses and then the entire program
+    """End curses and then the entire program.
+
     -Adapted from Johan Kotlinski's answer to this question:
         -https://stackoverflow.com/questions/4205317/capture-keyboardinterrupt-in-python-without-try-except
     """

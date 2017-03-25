@@ -35,24 +35,24 @@ To use the system:
 - Regularly delete motifs
 - Make P more user-friendly for those who can't edit Max files
 - Write more thorough, Pythonic docstrings for functions:
-  * store_new_note
-  * queue_next_motif
-  * retrieve_next_note
-  * send_note
+  * ~~store_new_note~~
+  * ~~queue_next_motif~~
+  * ~~retrieve_next_note~~
+  * ~~send_note~~
   * motif_detection
-  * quantize_duration
-  * generate_motif
-  * permutate_motif
-  * retograde
-  * transpose
-  * stretch
-  * transform_pitch
+  * ~~quantize_duration~~
+  * ~~generate_motif~~
+  * ~~permutate_motif~~
+  * ~~retrograde~~
+  * ~~transpose~~
+  * ~~stretch~~
+  * ~~transform_pitch~~
   * add_flourish
-  * osc_generate_motif
+  * ~~osc_generate_motif~~
   * osc_permutate_motif
   * osc_motif_detection
-  * info_check
-  * setup_window
+  * ~~info_check~~
+  * ~~setup_window~~
   * motif_to_screen
   * detect_to_screen
   * input_to_screen
