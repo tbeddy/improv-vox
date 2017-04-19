@@ -15,18 +15,26 @@ Included in this repo:
 
 ## Required libraries
 
+### Max
+
+* FTM http://ftm.ircam.fr
+
+### Python (via pip)
+
 * music21 http://web.mit.edu/music21/
 * python-osc https://pypi.python.org/pypi/python-osc
-
-Both are available via pip.
 
 ## Usage
 
 To use the system:
 
-1.  Run the file P.maxpat in Max.
-2.  Run the file Q.csd in Csound
-3.  Run the file f.py in your terminal.
+1.  Run the P.maxpat in Max.
+2.  Run the Q.csd in CsoundQt
+3.  Run the f.py in your terminal with Python.
+
+Alteratively, you can run launch_system.py to launch all three components. Csound will instead run as a command line program.
+
+I have only tested the system in OS X 10.11.3 El Capitan. I expect the Csound component to run fine in Windows or Linux. The Python component likely won't run correctly in Windows because it uses a Unix-only library (curses). Max is not available in a native Linux version and I expect the fragile web of externals in the component to break in Windows.
 
 ## TODO
 
