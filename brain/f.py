@@ -32,6 +32,8 @@ f2min = 550; f2max = 1900
 f3min = 2550; f3max = 2850
 f4min = 2750; f4max = 3250
 f5min = 3000; f5max = 3600
+notelist_size = 20             # Number of notes to check when using motif_detection
+max_motif_num = 5
 
 human_pitches = []             # All notes played by the human
 human_durations = []
@@ -39,7 +41,12 @@ motif_pool_pitches = []        # Pitched motifs derived from these notes
 motif_pool_durations = []      # Rhythmics motifs derived from these notes
 pitch_queue = Queue()          # Notes queued up to be output
 duration_queue = Queue()
-notelist_size = 20             # Number of notes to check when using motif_detection
+current_pitch_motif = []
+current_duration_motif = []
+cpm_count = 0
+cdm_count = 0
+cpm_queue = Queue()
+cdm_queue = Queue()
 last_time = time()*1000.0      # The last time the time was checked
 next_duration = 1000           # If this duration is passed, then next note will be sent to output
 
@@ -48,7 +55,7 @@ next_duration = 1000           # If this duration is passed, then next note will
 # These functions are for storing notes and using them when needed.
 
 
-def store_new_note(unused_addr, pitch, duration, amplitude, f1, f2, f3, f4, f5):
+def store_new_note(pitch, duration, amplitude, f1, f2, f3, f4, f5):
     """Store incoming notes as they are received.
 
     The note is stored in the global list human_all_notes in the custom class
@@ -102,7 +109,7 @@ def queue_next_motif():
     Returns:
       None
     """
-    global motif_pool_pitches, pitch_queue, motif_pool_durations, duration_queue
+    global motif_pool_pitches, motif_pool_durations, pitch_queue, duration_queue, cpm_queue, cdm_queue
     if (pitch_queue.qsize() < 10):
         motif_index = (len(motif_pool_pitches)-1) - int(len(motif_pool_pitches)*expovariate(3.0))
         selected_motif = motif_pool_pitches[motif_index]
@@ -110,6 +117,7 @@ def queue_next_motif():
         for i in range(repetitions):
             for current_note in selected_motif:
                 pitch_queue.put(current_note)
+            cpm_queue.put(selected_motif)
     if (duration_queue.qsize() < 10):
         motif_index = (len(motif_pool_durations)-1) - int(len(motif_pool_durations)*expovariate(3.0))
         selected_motif = motif_pool_durations[motif_index]
@@ -117,6 +125,7 @@ def queue_next_motif():
         for i in range(repetitions):
             for current_note in selected_motif:
                 duration_queue.put(current_note)
+            cdm_queue.put(selected_motif)
 
 
 def retrieve_next_note():
@@ -133,7 +142,7 @@ def retrieve_next_note():
     Returns:
       None
     """
-    global next_duration, last_time, pitch_queue, duration_queue
+    global next_duration, last_time, pitch_queue, duration_queue, current_pitch_motif, current_duration_motif, cpm_count, cdm_count
     current_time = time()*1000.0  # Convert from seconds to milliseconds
     if (next_duration <= (current_time - last_time)):
         current_pitch = pitch_queue.get()
@@ -142,6 +151,22 @@ def retrieve_next_note():
         send_note(current_pitch, current_duration, 1.0, f1min, f2min, f3min, f4min, f5min)
         output_to_screen("P: {}, D: {}".format(current_pitch, current_duration))
         last_time = time()*1000.0
+
+        if (cpm_count >= len(current_pitch_motif)):
+            current_motif = cpm_queue.get()
+            cpm_to_screen(current_motif)
+            cpm_count = 1
+            current_pitch_motif = current_motif
+        else:
+            cpm_count += 1
+
+        if (cdm_count >= len(current_duration_motif)):
+            current_motif = cdm_queue.get()
+            cdm_to_screen(current_motif)
+            cdm_count = 1
+            current_duration_motif = current_motif
+        else:
+            cdm_count += 1
 
 
 def send_note(pitch, duration, amplitude, f1, f2, f3, f4, f5):
@@ -192,25 +217,17 @@ def motif_detection(notelist, parameter):
 
     # Save the longest motif, if the list isn't empty and hasn't been saved already
     if (parameter == "pitch"):
-        if most_common_motifs and (most_common_motifs[0] not in motif_pool_pitches):
-            best_motif = []
-            for p in most_common_motifs[0]:
-                best_motif.append(p)
-                motif_pool_pitches.append(best_motif)
-                detect_to_screen(best_motif)
-            return best_motif
-        else:
-            return []
+        if (most_common_motifs and (list(most_common_motifs[0]) not in motif_pool_pitches)):
+            best_motif = list(most_common_motifs[0])
+            is_human = True
+            motif_to_screen(best_motif, "pitch", is_human)
+            motif_pool_pitches.append(best_motif)
     elif (parameter == "duration"):
-        if most_common_motifs and (most_common_motifs[0] not in motif_pool_durations):
-            best_motif = []
-            for d in most_common_motifs[0]:
-                best_motif.append(d)
-                motif_pool_durations.append(best_motif)
-                detect_to_screen(best_motif)
-            return best_motif
-        else:
-            return []
+        if (most_common_motifs and (list(most_common_motifs[0]) not in motif_pool_durations)):
+            best_motif = list(most_common_motifs[0])
+            is_human = True
+            motif_to_screen(best_motif, "duration", is_human)
+            motif_pool_durations.append(best_motif)
 
 
 def quantize_duration(dur):
@@ -257,12 +274,14 @@ def generate_motif(parameter):
         for i in range(phrase_length):
             new_motif.append(randint(lowest_pitch, highest_pitch))
         motif_pool_pitches.append(new_motif)
-        motif_to_screen(new_motif, "pitch")
+        not_human = False
+        motif_to_screen(new_motif, "pitch", not_human)
     elif (parameter == "duration"):
         for i in range(phrase_length):
             new_motif.append(randrange(500, 1501, 500))
         motif_pool_durations.append(new_motif)
-        motif_to_screen(new_motif, "duration")
+        not_human = False
+        motif_to_screen(new_motif, "duration", not_human)
 
 
 def permutate_motif(motif, parameter):
@@ -282,7 +301,7 @@ def permutate_motif(motif, parameter):
     if (func_num == 1):
         return retrograde(motif)
     elif (func_num == 2):
-        return transpose(motif, randint(-3, 3))   # Random interval
+        return transpose(motif, randint(-3, 3))
     elif (func_num == 3):
         return stretch(motif, choice([0.25, 0.5, 1.5, 2.0]))
     elif (func_num == 4):
@@ -453,6 +472,10 @@ def make_phrase_intune(motif):
 # ~~~~~~~~~~~~~~~~~~~~OSC Functions~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # These functions are only called through OSC messages.
 # Their purpose is to call similarly named functions without the baggage of OSC addresses as inputs.
+# That way, those other functions can be called from within the program if necessary.
+
+def osc_store_new_note(unused_addr, pitch, duration, amplitude, f1, f2, f3, f4, f5):
+    store_new_note(pitch, duration, amplitude, f1, f2, f3, f4, f5)
 
 
 def osc_generate_motif(unused_addr):
@@ -475,35 +498,30 @@ def osc_permutate_motif(unused_addr):
     while (new_motif in motif_pool_pitches):      # If the new motif has already been generated, generate a new motif
         new_motif = permutate_motif(choice(motif_pool_pitches), "pitch")
     motif_pool_pitches.append(new_motif)
-    motif_to_screen(new_motif, "pitch")
+    not_human = False
+    motif_to_screen(new_motif, "pitch", not_human)
 
     old_motif = choice(motif_pool_durations)
     new_motif = permutate_motif(old_motif, "duration")        # Generate a new motif by permutating one of the saved motifs
     while (new_motif in motif_pool_durations):      # If the new motif has already been generated, generate a new motif
         new_motif = permutate_motif(choice(motif_pool_durations), "duration")
     motif_pool_durations.append(new_motif)
-    motif_to_screen(new_motif, "duration")
+    not_human = False
+    motif_to_screen(new_motif, "duration", not_human)
 
 
 def osc_motif_detection(unused_addr):
     global human_pitches, motif_pool_pitches, human_durations, motif_pool_durations
 
     pitchlist = human_pitches[(-1 * notelist_size):]
-    new_motif = motif_detection(pitchlist, "pitch")
-    if new_motif:                                   # If motif_detection was able to find a new motif...
-        motif_pool_pitches.append(new_motif)        # ...store it...
-        detect_to_screen(new_motif)                 # ...and print it to the window
+    motif_detection(pitchlist, "pitch")
 
     durationlist = human_durations[(-1 * notelist_size):]
-    new_motif = motif_detection(durationlist, "duration")
-    if new_motif:                                   # If motif_detection was able to find a new motif...
-        motif_pool_durations.append(new_motif)      # ...store it...
-        detect_to_screen(new_motif)                 # ...and print it to the window
-
+    motif_detection(durationlist, "duration")
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~Curses~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# These functions are for managing the pseudo-GUI
+# These functions are for managing the pseudo-GUI.
 
 
 def info_check(some_string):
@@ -542,27 +560,41 @@ def setup_window(window, title):
     window.move(2, 1)
 
 
-def motif_to_screen(motif, parameter):
+def motif_to_screen(motif, parameter, is_detected):
     if (parameter == "pitch"):
-        cur_y, cur_x = pitch_win.getyx()            # Grab the cursor's current x and y positions
-        pitch_win.addstr(cur_y, cur_x, str(motif))  # Print the motif to the window
-        pitch_win.move(cur_y+1, cur_x)              # Move the cursor to the next line for next time
-        pitch_win.border()                          # Re-draw the border
-        pitch_win.refresh()                         # Refresh the window
-    if (parameter == "duration"):
-        cur_y, cur_x = dur_win.getyx()         # Grab the cursor's current x and y positions
-        dur_win.addstr(cur_y, cur_x, str(motif))    # Print the motif to the window
-        dur_win.move(cur_y+1, cur_x)                # Move the cursor to the next line for next time
-        dur_win.border()                            # Re-draw the border
-        dur_win.refresh()                           # Refresh the window
+        cur_y, cur_x = pitch_win.getyx()
+        if is_detected:
+            pitch_win.addstr(cur_y, cur_x, str(motif), curses.color_pair(2))
+        else:
+            pitch_win.addstr(cur_y, cur_x, str(motif))
+        pitch_win.move(cur_y+1, cur_x)
+        pitch_win.border()
+        pitch_win.refresh()
+    elif (parameter == "duration"):
+        cur_y, cur_x = dur_win.getyx()
+        if is_detected:
+            dur_win.addstr(cur_y, cur_x, str(motif), curses.color_pair(2))
+        else:
+            dur_win.addstr(cur_y, cur_x, str(motif))
+        dur_win.move(cur_y+1, cur_x)
+        dur_win.border()
+        dur_win.refresh()
 
 
-def detect_to_screen(motif):
-    cur_y, cur_x = dur_win.getyx()
-    dur_win.addstr(cur_y, cur_x, str(motif))
-    dur_win.move(cur_y+1, cur_x)
-    dur_win.border()
-    dur_win.refresh()
+def cpm_to_screen(motif):
+    cpm_win.deleteln()
+    cpm_win.insertln()
+    cpm_win.addstr(2, 1, str(motif))
+    cpm_win.border()
+    cpm_win.refresh()
+
+
+def cdm_to_screen(motif):
+    cdm_win.deleteln()
+    cdm_win.insertln()
+    cdm_win.addstr(2, 1, str(motif))
+    cdm_win.border()
+    cdm_win.refresh()
 
 
 def input_to_screen(note):
@@ -579,6 +611,9 @@ def output_to_screen(note):
     output_win.addstr(2, 1, note)
     output_win.border()
     output_win.refresh()
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~Random~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 def signal_handler(signal, frame):
@@ -598,32 +633,34 @@ if __name__ == "__main__":
     stdscr = curses.initscr()      # Initialize curses
     curses.noecho()
     curses.cbreak()
+    curses.curs_set(0)
     term_height = curses.LINES     # Terminal height
     term_width = curses.COLS       # Terminal width
 
-    """
     curses.start_color()
     curses.use_default_colors()
+    #curses.init_color(0, 0, 0, 0)
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_WHITE)
     stdscr.bkgd(' ', curses.color_pair(1))
-    """
 
     # Create several subwindows to visualize data in the terminal
-    input_win = stdscr.subwin(   term_height//4, term_width//4, 0,              0)
-    output_win = stdscr.subwin(  term_height//4, term_width//4, term_height//4, 0)
-    pitch_win = stdscr.subwin(   term_height,    term_width//4, 0,              term_width//4)
-    dur_win = stdscr.subwin(     term_height,    term_width//4, 0,              term_width//2)
-    info_win = stdscr.subwin(    term_height//2, term_width//4, term_height//2, 0)
-    queue_win = stdscr.subwin(   term_height,    term_width//4, 0,              (term_width*3)//4)
+    input_win = stdscr.subwin(    term_height//4, term_width//4, 0,                  0)
+    output_win = stdscr.subwin(   term_height//8, term_width//4, term_height//4,     0)
+    pitch_win = stdscr.subwin(    term_height//2, term_width//4, 0,                  term_width//4)
+    dur_win = stdscr.subwin(      term_height//2, term_width//4, 0,                  term_width//2)
+    info_win = stdscr.subwin(     term_height//2, term_width//4, 0,                  (term_width*3)//4)
+    cpm_win = stdscr.subwin(      term_height//8, term_width//4, (term_height*3)//8, 0)
+    cdm_win = stdscr.subwin(      term_height//8, term_width//4, term_height//2,     0)
 
     # Setup each window (border, title).
     setup_window(input_win, "Input")
     setup_window(output_win, "Output")
     setup_window(pitch_win, "Pitched Motifs")
     setup_window(dur_win, "Rhythmic Motifs")
-    setup_window(queue_win, "Queue")
     setup_window(info_win, "Info")
+    setup_window(cpm_win, "Current Pitched Motif")
+    setup_window(cdm_win, "Current Rhythmic Motif")
 
     # Print the OSC addresses in info_win.
     cur_y, cur_x = info_win.getyx()
@@ -635,7 +672,7 @@ if __name__ == "__main__":
     info_win.move(cur_y+4, cur_x)
     info_win.addstr("If using launch_system.py,")
     info_win.move(cur_y+5, cur_x)
-    info_win.addstr("Ctrl-C will also end Csound.") #, curses.color_pair(1))
+    info_win.addstr("Ctrl-C will also end Csound.")
 
     # Make all the changes to curses visible.
     stdscr.refresh()
@@ -667,9 +704,11 @@ if __name__ == "__main__":
         (input_args.ip, input_args.port), dispatcher)
 
     # Generate a few motifs to start out.
-    for i in range(randint(1, 3)):
+    #for i in range(randint(1, 3)):
+    #    generate_motif("pitch")
+    #for i in range(randint(1, 3)):
+    for i in range(max_motif_num):
         generate_motif("pitch")
-    for i in range(randint(1, 3)):
         generate_motif("duration")
 
     signal.signal(signal.SIGINT, signal_handler)
