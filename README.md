@@ -1,6 +1,6 @@
 # improv-vox
 
-This is a project for real-time musical improvisation. It is built around the three part "PfQ" model proposed by Blackwell et al[1]:
+This is a project for real-time musical improvisation. It is built around the three part "PQf" model proposed by Blackwell et al[1]:
 
 * P - Receives audio input and outputs symbolic notation (pitch, duration, timbre). Iimplemented in Max/MSP.
 * f - Receives the symbolic notation from P and outputs symbolic notation in the same format. This is the core of this project. Written in Python 3.
@@ -10,8 +10,8 @@ Included in this repo:
 * a P file
 * a f file
 * a Q file
-* a test script (to mimic P)
 * a Python class file for P
+* a script to launch all three components
 
 ## Installation
 
@@ -30,11 +30,12 @@ Included in this repo:
 
 To use the system:
 
-1.  Run the P.maxpat in Max.
-2.  Run the Q.csd in CsoundQt.
-3.  Run the f.py in your terminal with Python.
+1.  Open P.maxpat (in the ear folder) in Max.
+2.  Open Q.csd (in the mouth folder) in CsoundQt and press the Run button in the top left corner.
+3.  In the terminal application, run f.py (in the brain folder) with Python: <code> python brain/f.py </code>
 
-Alteratively, you can run launch_system.py to launch all three components. Csound will instead run as a command line program.
+
+Alteratively, you can run launch_system.py to launch all three components: <code> python launch_system.py </code> Csound will instead run as a command line program.
 
 I have only tested the system in OS X 10.11.3 El Capitan. I expect the Csound component to run fine in Windows or Linux. The Python component likely won't run correctly in Windows because it uses a Unix-only library (curses). Max is not available in a native Linux version and I expect the fragile web of externals in the component to break in Windows.
 
