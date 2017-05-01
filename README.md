@@ -31,7 +31,7 @@ Included in this repo:
 To use the system:
 
 1.  Run the P.maxpat in Max.
-2.  Run the Q.csd in CsoundQt
+2.  Run the Q.csd in CsoundQt.
 3.  Run the f.py in your terminal with Python.
 
 Alteratively, you can run launch_system.py to launch all three components. Csound will instead run as a command line program.
