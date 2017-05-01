@@ -13,6 +13,8 @@ Included in this repo:
 * a test script (to mimic P)
 * a Python class file for P
 
+## Installation
+
 ## Required libraries
 
 ### Max
@@ -35,38 +37,6 @@ To use the system:
 Alteratively, you can run launch_system.py to launch all three components. Csound will instead run as a command line program.
 
 I have only tested the system in OS X 10.11.3 El Capitan. I expect the Csound component to run fine in Windows or Linux. The Python component likely won't run correctly in Windows because it uses a Unix-only library (curses). Max is not available in a native Linux version and I expect the fragile web of externals in the component to break in Windows.
-
-## TODO
-
-- Make the docs/comments more consistent and pretty
-- Implement rhythmic motifs
-- Regularly delete motifs
-- Make P more user-friendly for those who can't edit Max files
-- Write more thorough, Pythonic docstrings for functions:
-  * ~~store_new_note~~
-  * ~~queue_next_motif~~
-  * ~~retrieve_next_note~~
-  * ~~send_note~~
-  * motif_detection
-  * ~~quantize_duration~~
-  * ~~generate_motif~~
-  * ~~permutate_motif~~
-  * ~~retrograde~~
-  * ~~transpose~~
-  * ~~stretch~~
-  * ~~transform_pitch~~
-  * add_flourish
-  * ~~osc_generate_motif~~
-  * osc_permutate_motif
-  * osc_motif_detection
-  * ~~info_check~~
-  * ~~setup_window~~
-  * motif_to_screen
-  * detect_to_screen
-  * input_to_screen
-  * output_to_screen
-  * queue_to_screen
-  * signal_handler
 
 ## Contributing
 
