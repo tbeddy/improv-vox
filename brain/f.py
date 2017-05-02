@@ -1,10 +1,18 @@
 """
+Written in Python 3.5.1
+MIT License (c) Tim Bedford
+
 The goal of this file is to receive information that has been extracted
 from real-time monophonic audio and output similar information for use with
 a software synthesizer.
 
-Written in Python 3.5.1
-MIT License (c) Tim Bedford
+The documentation style tries to follow that of Google:
+https://google.github.io/styleguide/pyguide.html
+
+Due to late implementation of rhythmic motifs, there are several sections
+of repetitive if/else blocks. These should be rewritten and information
+regarding each parameter should each be simplfied and encapsulated within
+a dictionary or object.
 """
 
 import argparse
@@ -66,9 +74,9 @@ def store_new_note(pitch, duration, amplitude, f1, f2, f3, f4, f5):
     five arguments will likely be rewritten as a single list.
 
     Arguments (various parameters of the note):
-      pitch (int): This should be in MIDI pitch format.
+      pitch (float): This should be in MIDI pitch format.
          e.g. 60 (equivalent to C5)
-      duration (int): This should be in milliseconds(ms). It will be quantized
+      duration (float) This should be in milliseconds(ms). It will be quantized
          (i.e. rounded to the nearest 500 ms) before being stored.
          e.g. 850 (equivalent to 0.850 seconds)
          This will be stored as 1000.
@@ -88,7 +96,7 @@ def store_new_note(pitch, duration, amplitude, f1, f2, f3, f4, f5):
                       amplitude,
                       f1, f2, f3, f4, f5)
     human_pitches.append(int(pitch))
-    human_durations.append(duration)
+    human_durations.append(quantize_duration(duration))
     input_to_screen(new_note)
 
 
@@ -148,7 +156,10 @@ def retrieve_next_note():
         current_pitch = pitch_queue.get()
         current_duration = duration_queue.get()
         next_duration = current_duration
-        send_note(current_pitch, current_duration, 1.0, f1min, f2min, f3min, f4min, f5min)
+        send_note(current_pitch,
+                  current_duration,
+                  uniform(0.4, 1.0),
+                  f1min, f2min, f3min, f4min, f5min)
         output_to_screen("P: {}, D: {}".format(current_pitch, current_duration))
         last_time = time()*1000.0
 
@@ -176,7 +187,14 @@ def send_note(pitch, duration, amplitude, f1, f2, f3, f4, f5):
     to an OSC message.
 
     Arguments:
-      this_note(MyNote)
+      pitch (int)
+      duration (int)
+      amplitude (int)
+      f1 (int)
+      f2 (int)
+      f3 (int)
+      f4 (int)
+      f5 (int)
 
     Returns:
       None
@@ -199,11 +217,18 @@ def send_note(pitch, duration, amplitude, f1, f2, f3, f4, f5):
 
 
 def motif_detection(notelist, parameter):
-    """
-    -Looks for patterns in a list of notes
-    -Patterns are intended to be recognizable musical motifs, melodic or rhythmic
-    -The longest pattern found more than once is returned
-    -Pattern length can be anywhere from two notes to half the length of notelist
+    """Detect motifs within parameter sequence.
+
+    Find the longest sequence in a list that appears more than once and has not
+    already been detected. These sequences are intended to be recognizable
+    musical motifs. Either pitch or duration can be detected.
+
+    Arguments:
+      notelist (list of ints)
+      parameter (string)
+
+    Returns:
+      None
     """
     global motif_pool_pitches, motif_pool_durations
     subnotelist_coll = []
@@ -212,8 +237,12 @@ def motif_detection(notelist, parameter):
         for j in range(0, len(notelist)-(i-1)):
             subnotelist.append(tuple(notelist[j:j+i]))
         subnotelist_coll.append(subnotelist)
-    cnt = [Counter(subnotelist) for subnotelist in subnotelist_coll]                          # Make a Counter object for each list of possible motifs
-    most_common_motifs = [c.most_common(1)[0][0] for c in cnt if c.most_common(1)[0][1] > 1]  # Grab the most common motif from each Counter
+
+    # Make a Counter object for each list of possible motifs
+    cnt = [Counter(subnotelist) for subnotelist in subnotelist_coll]
+
+    # Grab the most common motif from each Counter
+    most_common_motifs = [c.most_common(1)[0][0] for c in cnt if c.most_common(1)[0][1] > 1]
 
     # Save the longest motif, if the list isn't empty and hasn't been saved already
     if (parameter == "pitch"):
@@ -237,7 +266,7 @@ def quantize_duration(dur):
        http://stackoverflow.com/questions/9810391/round-to-the-nearest-500-python
 
     Arguments:
-      dur(int)
+      dur (int)
 
     Returns:
       An int
@@ -257,12 +286,12 @@ def quantize_duration(dur):
 def generate_motif(parameter):
     """Generate a random motif.
 
-    Add a new motif to motif_pool_pitches. The motif is two to five notes long
-    and all of the notes' parameters are randomized. The motif should have no
-    relation to anything the vocalist is doing.
+    Store a new motif of the designated paramter. The motif is two to five
+    values long. The motif should have no relation to anything the vocalist
+    is doing.
 
     Arguments:
-      None
+      parameter (string)
 
     Returns:
       None
@@ -287,11 +316,17 @@ def generate_motif(parameter):
 def permutate_motif(motif, parameter):
     """Randomly apply one of the permutation functions to a motif.
 
+    Most permutations can only be applied to motifs of a certain parameter.
+    The functions add_flourish, make_phrase_outoftune, make_note_intune,
+    and make_phrase_intune cannot currently be used. add_flourish has
+    various problems when used and the other functions will only be used
+    if microtonality is implemented, which is yet to determined.
+
     Arguments:
-      motif(list of MyNotes)
+      motif (list of ints)
 
     Returns:
-      A list of MyNotes
+      A list of ints
     """
     if (parameter == "pitch"):
         func_num = choice([1, 2, 4])
@@ -320,10 +355,10 @@ def retrograde(motif):
     None of the notes' parameters are altered.
 
     Arguments:
-      motif(list of MyNotes)
+      motif (list of ints)
 
     Returns:
-      A list of MyNotes
+      A list of ints
     """
     new_motif = []
     for i in range(len(motif)-1, -1, -1):
@@ -337,11 +372,11 @@ def transpose(motif, interval):
     Only the notes' pitch parameters are altered.
 
     Arguments:
-      motif(list of MyNotes)
-      interval(int)
+      motif (list of MyNotes)
+      interval (int)
 
     Returns:
-      A list of MyNotes
+      A list of int
     """
     new_motif = [(i + interval) for i in motif]
     return new_motif
@@ -354,11 +389,11 @@ def stretch(motif, degree):
     parameter is altered.
 
     Arguments:
-      motif(list of MyNotes)
-      degree(float)
+      motif (list of ints)
+      degree (float)
 
     Returns:
-      A list of MyNotes
+      A list of ints
     """
     if (any(n > 2000 for n in motif)) and (degree >= 1.0):    # Don't stretch motifs with very long notes
         degree = choice([0.25, 0.5])
@@ -375,10 +410,10 @@ def transform_pitch(motif):
     as it isn't the same as the old pitch.
 
     Arguments:
-      motif(list of MyNotes)
+      motif(list of int)
 
     Returns:
-      A list of MyNotes
+      A list of ints
     """
     transform_point = randint(0, len(motif)-1)
     old_pitch = motif[transform_point]
@@ -561,6 +596,19 @@ def setup_window(window, title):
 
 
 def motif_to_screen(motif, parameter, is_detected):
+    """Print a motif.
+
+    The use of booleans for is_detected is very ugly and should be replaced.
+
+    Arguments:
+      motif (list of ints)
+      parameter (string)
+      is_detected (boolean)
+
+    Returns:
+      None
+
+    """
     if (parameter == "pitch"):
         cur_y, cur_x = pitch_win.getyx()
         if is_detected:
@@ -582,6 +630,14 @@ def motif_to_screen(motif, parameter, is_detected):
 
 
 def cpm_to_screen(motif):
+    """Print the current pitched motif.
+
+    Arguments:
+      None
+
+    Returns:
+      None
+    """
     cpm_win.deleteln()
     cpm_win.insertln()
     cpm_win.addstr(2, 1, str(motif))
@@ -590,6 +646,14 @@ def cpm_to_screen(motif):
 
 
 def cdm_to_screen(motif):
+    """Print the current rhythmic motif.
+
+    Arguments:
+      None
+
+    Returns:
+      None
+    """
     cdm_win.deleteln()
     cdm_win.insertln()
     cdm_win.addstr(2, 1, str(motif))
@@ -598,6 +662,19 @@ def cdm_to_screen(motif):
 
 
 def input_to_screen(note):
+    """Print the parameters for an incoming note.
+
+    Only one note will appear on screen at a time.
+
+    This function and output_to_screen receive and display notes differently.
+    This should be more consistent.
+
+    Arguments:
+      note (string)
+
+    Returns:
+      None
+    """
     input_win.deleteln()
     input_win.insertln()
     input_win.addstr(2, 1, str(note))
@@ -606,6 +683,16 @@ def input_to_screen(note):
 
 
 def output_to_screen(note):
+    """Print parameters for a note being output.
+
+    Only one note will appear on screen at a time.
+
+    Arguments:
+      note (string)
+
+    Returns:
+      None
+    """
     output_win.deleteln()
     output_win.insertln()
     output_win.addstr(2, 1, note)
@@ -619,7 +706,7 @@ def output_to_screen(note):
 def signal_handler(signal, frame):
     """End curses and then the entire program.
 
-    -Adapted from Johan Kotlinski's answer to this question:
+    -dapted from Johan Kotlinski's answer to this question:
         -https://stackoverflow.com/questions/4205317/capture-keyboardinterrupt-in-python-without-try-except
     """
     curses.endwin()
@@ -639,7 +726,6 @@ if __name__ == "__main__":
 
     curses.start_color()
     curses.use_default_colors()
-    #curses.init_color(0, 0, 0, 0)
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_WHITE)
     stdscr.bkgd(' ', curses.color_pair(1))
@@ -703,10 +789,7 @@ if __name__ == "__main__":
     server = osc_server.ThreadingOSCUDPServer(
         (input_args.ip, input_args.port), dispatcher)
 
-    # Generate a few motifs to start out.
-    #for i in range(randint(1, 3)):
-    #    generate_motif("pitch")
-    #for i in range(randint(1, 3)):
+    # Generate the first collection of motfs.
     for i in range(max_motif_num):
         generate_motif("pitch")
         generate_motif("duration")
